@@ -311,12 +311,22 @@
     return results;
   }
   function coursesInWeek(courses,week) {return courses.filter(c=>c.weeks.includes(week)).sort((a,b)=>a.day-b.day||a.start-b.start||a.name.localeCompare(b.name,'zh'));}
+  function coursesForWeekView(courses,week) {
+    return courses.map(c=>({...c,isActive:c.weeks.includes(week)}))
+      .sort((a,b)=>a.day-b.day||a.start-b.start||Number(b.isActive)-Number(a.isActive)||a.name.localeCompare(b.name,'zh'));
+  }
   function layoutCourses(courses) {
     const positions=new Map();
     for(let day=1;day<=7;day++) {
-      const sorted=courses.filter(c=>c.day===day).sort((a,b)=>a.start-b.start||a.end-b.end||a.id.localeCompare(b.id));
+      const sorted=courses.filter(c=>c.day===day).sort((a,b)=>a.start-b.start||Number(b.isActive===true)-Number(a.isActive===true)||a.end-b.end||a.id.localeCompare(b.id));
       let group=[],groupEnd=0;
       function flush() {
+        const stacked=group.length>1&&group.every(c=>c.start===group[0].start&&c.end===group[0].end)&&group.some(c=>c.isActive===true)&&group.some(c=>c.isActive===false);
+        if(stacked) {
+          const weight=group.reduce((sum,c)=>sum+(c.isActive?2:1),0);let offset=0;
+          for(const c of group){const size=(c.isActive?2:1)/weight;positions.set(c.id,{lane:0,count:1,stackKey:day+':'+c.start+':'+c.end,stackOffset:offset,stackSize:size});offset+=size;}
+          group=[];groupEnd=0;return;
+        }
         const laneEnds=[], assigned=[];
         for(const c of group){let lane=laneEnds.findIndex(end=>end<c.start);if(lane<0)lane=laneEnds.length;laneEnds[lane]=c.end;assigned.push([c.id,lane]);}
         for(const [id,lane] of assigned)positions.set(id,{lane,count:laneEnds.length});
@@ -327,5 +337,5 @@
     }
     return positions;
   }
-  return {MAX_WEEKS,MAX_COURSES,MAX_SECTIONS,DEFAULT_TIMES,text,uid,parseWeeks,formatWeeks,parseDay,parseSections,validateCourse,parseCell,parseMatrix,parseWorkbook,readImport,parseDate,dateString,mondayOf,currentWeek,weekDates,defaultState,validateState,findConflicts,coursesInWeek,layoutCourses};
+  return {MAX_WEEKS,MAX_COURSES,MAX_SECTIONS,DEFAULT_TIMES,text,uid,parseWeeks,formatWeeks,parseDay,parseSections,validateCourse,parseCell,parseMatrix,parseWorkbook,readImport,parseDate,dateString,mondayOf,currentWeek,weekDates,defaultState,validateState,findConflicts,coursesInWeek,coursesForWeekView,layoutCourses};
 });

@@ -18,7 +18,7 @@
 
 ## 自动测试
 
-### 解析、日期与数据校验：15 项通过
+### 解析、日期与数据校验：17 项通过
 
 ```powershell
 npm.cmd test
@@ -26,7 +26,9 @@ npm.cmd test
 
 覆盖周次、无效输入、星期节次、URP 单元格、同一单元格多条课程、清单表头、重复去重、合并单元格、偏移工作表范围、真实格式的模拟文件读取、跨年日期、时间冲突、冲突链布局、备份结构和设置校验。
 
-### 手机尺寸浏览器测试：仓库通用测试 4 项通过
+0.1.1 新增非本周课程的视图标记、原数据不变、同一时段本周/非本周卡片上下排列与本周优先、单双周不误报冲突的校验。
+
+### 手机尺寸浏览器测试：仓库通用测试 5 项通过
 
 ```powershell
 npm.cmd run test:ui
@@ -34,11 +36,15 @@ npm.cmd run test:ui
 
 使用 Edge，视口 393 × 852，中文环境，Asia/Shanghai 时区。覆盖空态、选择文件、导入预览确认、周次筛选、刷新恢复、列表与详情、各格式导入、设置校验、手动修改、JSON 下载恢复、坏文件不覆盖原数据、文本安全和无外部请求。
 
-此外，本机针对一份实际 PDF 转换文件的专用导入测试已通过。该测试和输入文件保留在本机，不列入仓库可复现的通用测试；克隆仓库后运行测试不需要个人文件。此后未修改 APK 代码，因此不重建安装包或无变化地重复安卓模拟器测试。
+0.1.1 新增对灰色实际样式、非本周课程可点击、上下卡片不遮挡、本周计数不包含灰色安排、列表灰色状态、无课周仍保留参考安排的测试。截图已人工查看。
 
-### Android 原生 Instrumentation：8 项通过
+此外，本机针对一份实际 PDF 转换文件的专用导入测试已通过，并已更新为区分本周与非本周卡片。该测试和输入文件保留在本机，不列入仓库可复现的通用测试；克隆仓库后运行测试不需要个人文件。
 
-使用 Android 15（API 35）、x86_64、Pixel 6 模拟器和系统 WebView。测试验证首次空态、原生流读取 CSV、私有目录写入、单双/指定周、Activity 重建恢复、详情对话框和手机布局。
+### Android 原生 Instrumentation：10 项通过，覆盖安装检查 4 项通过
+
+使用 Android 15（API 35）、x86_64、Pixel 6 模拟器和系统 WebView。测试验证首次空态、原生流读取 CSV、私有目录写入、单双/指定周、非本周灰色卡片与详情标记、Activity 重建恢复、详情对话框和手机布局。
+
+另从 0.1.0 覆盖安装 0.1.1，确认原有 5 条模拟课程加载成功、私有课表文件内容逐字节不变、灰色参考安排正常显示且可点击。覆盖安装测试在常规测试清空专用模拟器数据之前执行。
 
 以下命令仅用于无真实数据的专用模拟器（示例序列号 `emulator-5554`）。`pm clear` 会清空该模拟器上本应用的数据，禁止直接照搬到已有真实课表的手机。
 
@@ -51,7 +57,7 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 & $taskAdb -s emulator-5554 shell am instrument -w cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
 ```
 
-成功输出：`PASS: 8 Android checks`。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
+成功输出：`PASS: 10 Android checks`。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
 
 ## 构建与交付检查
 
@@ -66,6 +72,7 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 - [首次打开空态](empty-phone.png)
 - [周视图](schedule-phone.png)
 - [安卓原生文件导入预览](android-import-preview.png)
+- [0.1.1 非本周课程灰色显示](inactive-courses-phone.png)
 
 ## PDF 后续范围
 

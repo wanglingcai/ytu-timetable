@@ -20,13 +20,23 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class SmokeInstrumentation extends Instrumentation {
     private Activity activity;
     private int checks;
+    private boolean verifyExisting;
     private final StringBuilder report = new StringBuilder();
-    @Override public void onCreate(Bundle args) { super.onCreate(args); start(); }
+    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); start(); }
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
             launch();
             await("document.readyState==='complete' && !!window.receiveImport");
+            if(verifyExisting) {
+                check("JSON.parse(AndroidLocal.readState()).courses.length>0 && document.querySelector('#emptyState').hidden", "覆盖安装保留并加载原有课表");
+                check("document.querySelectorAll('.course-card').length===JSON.parse(AndroidLocal.readState()).courses.length", "覆盖安装后显示全部课程安排");
+                check("document.querySelectorAll('.course-card.inactive').length>0", "覆盖安装后非本周课程显示为灰色");
+                js("document.querySelector('.course-card.inactive').click();true");
+                check("document.querySelector('#courseDetail').textContent.includes('不上课（非本周）')", "覆盖安装后灰色课程可查看实际周次");
+                result.putString("stream", "\nPASS: " + checks + " Android upgrade checks\n" + report);
+                finish(Activity.RESULT_OK,result);return;
+            }
             check("document.querySelector('#emptyState').hidden===false", "首次启动无示例冒充真实课表");
             File input = new File(getTargetContext().getCacheDir(), "native-test.csv");
             String csv="课程名称,星期,节次,周次,教师,教室\n原生测试单周,星期一,1-2,1-18单周,测试教师,A101\n原生测试双周,星期二,3-4,1-18双周,测试教师,B202\n原生测试指定周,星期六,1-2,第3周,测试教师,C303";
@@ -38,13 +48,17 @@ public final class SmokeInstrumentation extends Instrumentation {
             await("!document.querySelector('#importDialog').open");
             check("JSON.parse(AndroidLocal.readState()).courses.length===3", "数据写入 Android 应用私有文件");
             js("document.querySelector('#weekSelect').value='2';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
-            check("document.querySelectorAll('.course-card').length===1 && document.querySelector('.course-card').textContent.includes('双周')", "双周只显示双周课程");
+            check("document.querySelectorAll('.course-card:not(.inactive)').length===1 && document.querySelector('.course-card:not(.inactive)').textContent.includes('双周')", "双周仅双周课正常着色");
+            check("document.querySelectorAll('.course-card.inactive').length===2", "非本周课程仍以灰色保留");
+            js("document.querySelector('.course-card.inactive').click();true");
+            check("document.querySelector('#courseDetail').textContent.includes('第 2 周不上课（非本周）')", "灰色课程详情明确标注所选周不上课");
+            js("document.querySelector('#courseDialog').close();true");
             js("document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
-            check("document.querySelectorAll('.course-card').length===2", "指定周和单周课程同时正确显示");
+            check("document.querySelectorAll('.course-card:not(.inactive)').length===2", "指定周和单周课程同时正常着色");
             runOnMainSync(() -> activity.finish());
             waitForIdleSync();launch();await("document.readyState==='complete' && !!window.receiveImport");
             check("document.querySelector('#emptyState').hidden===true && JSON.parse(AndroidLocal.readState()).courses.length===3", "销毁并重建 Activity 后恢复本地课表");
-            js("document.querySelector('#weekSelect').value='2';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));document.querySelector('.course-card').click();true");
+            js("document.querySelector('#weekSelect').value='2';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));document.querySelector('.course-card:not(.inactive)').click();true");
             check("document.querySelector('#courseDialog').open && document.querySelector('#courseDetail').textContent.includes('B202')", "原生 WebView 中详情对话框可用");
             js("document.querySelector('#courseDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
             check("document.documentElement.scrollWidth<=innerWidth", "手机界面没有横向溢出");

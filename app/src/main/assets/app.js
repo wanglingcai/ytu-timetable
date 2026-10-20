@@ -42,14 +42,15 @@
     notice.textContent=current<1?'学期还未开始。当前展示第 '+week+' 周，可在设置里核对第一周日期。':'已超出学期范围。当前展示第 '+week+' 周，可切换周次或在设置中调整学期。';
     const hasCourses=state.courses.length>0;$('emptyState').hidden=hasCourses;$('scheduleSection').hidden=!hasCourses;
     if(!hasCourses)return;
-    const active=activeCourses(), conflicts=T.findConflicts(active);
+    const active=activeCourses(), conflicts=T.findConflicts(active), displayed=T.coursesForWeekView(state.courses,week);
     $('scheduleHeading').textContent='本周安排 · '+active.length+' 项';
+    $('inactiveCount').textContent='非本周 '+(displayed.length-active.length)+' 项';
     $('conflictNotice').hidden=!conflicts.length;
     $('conflictNotice').textContent='有 '+conflicts.length+' 组课程时间重叠，均已保留。请点击“切换列表”逐一核对。';
     $('noWeekCourses').hidden=active.length>0;
     $('gridView').hidden=listMode;$('listView').hidden=!listMode;
     $('viewToggle').textContent=listMode?'切换周视图':'切换列表';
-    renderGrid(active,dates,conflicts);renderList(active,dates);
+    renderGrid(displayed,dates,conflicts);renderList(displayed,dates);
   }
   function renderGrid(active,dates,conflicts) {
     const grid=$('scheduleGrid');grid.replaceChildren();grid.style.setProperty('--sections',state.times.length);
@@ -60,22 +61,31 @@
       for(let d=1;d<=7;d++){const slot=el('div','grid-slot');slot.style.gridColumn=d+1;slot.style.gridRow=i+1;grid.append(slot);}
     }
     // Assign overlapping courses to separate lanes; all remain clickable.
-    const positions=T.layoutCourses(active);
+    const positions=T.layoutCourses(active),stacks=new Map();
     for(const c of active) {
-      const {lane:index,count}=positions.get(c.id);
-      const card=el('button','course-card palette-'+c.color+(conflicts.some(x=>x.a===c.id||x.b===c.id)?' conflict':''));
-      card.type='button';card.setAttribute('aria-label',c.name+'，'+DAY[c.day]+'第'+c.start+'-'+c.end+'节，'+c.room);
+      const position=positions.get(c.id),{lane:index,count}=position;
+      const inactive=!c.isActive;
+      const card=el('button','course-card palette-'+c.color+(inactive?' inactive':'')+(conflicts.some(x=>x.a===c.id||x.b===c.id)?' conflict':''));
+      card.type='button';card.setAttribute('aria-label',(inactive?'非本周，':'本周上课，')+c.name+'，'+DAY[c.day]+'第'+c.start+'-'+c.end+'节，'+c.room);
       card.style.gridColumn=c.day+1;card.style.gridRow=(c.start+1)+' / '+(c.end+2);
       if(count>1){card.style.width='calc('+(100/count)+'% - 2px)';card.style.marginLeft='calc('+(100*index/count)+'% + 1px)';}
+      if(inactive)card.append(el('span','course-status','非本周'));
       append(card,el('strong','',c.name),el('small','',c.room||'地点待定'));
-      card.addEventListener('click',()=>detail(c.id));grid.append(card);
+      card.addEventListener('click',()=>detail(c.id));
+      if(position.stackKey) {
+        let host=stacks.get(position.stackKey);
+        if(!host){host=el('div','course-stack');host.style.gridColumn=c.day+1;host.style.gridRow=(c.start+1)+' / '+(c.end+2);stacks.set(position.stackKey,host);grid.append(host);}
+        card.classList.add('stacked');card.style.top=(position.stackOffset*100)+'%';card.style.height='calc('+(position.stackSize*100)+'% - 3px)';host.append(card);
+      } else grid.append(card);
     }
   }
   function courseRow(c,withWeeks=false) {
-    const button=el('button','list-card');button.type='button';
-    const chip=el('span','time-chip palette-'+c.color,c.start+'–'+c.end+' 节');
+    const inactive=!c.weeks.includes(week);
+    const button=el('button','list-card'+(inactive?' inactive':''));button.type='button';
+    const chip=el('span','time-chip palette-'+c.color+(inactive?' inactive':''),c.start+'–'+c.end+' 节');
     const info=el('span','course-info');append(info,el('strong','',c.name),el('p','',[DAY[c.day],c.room||'地点待定',c.teacher].filter(Boolean).join(' · ')));
-    if(withWeeks)info.append(el('p','',T.formatWeeks(c.weeks)+' 周'));
+    if(inactive)info.append(el('p','course-status','非本周 · '+T.formatWeeks(c.weeks)+' 周上课'));
+    else if(withWeeks)info.append(el('p','',T.formatWeeks(c.weeks)+' 周'));
     append(button,chip,info,el('span','arrow','›'));button.addEventListener('click',()=>detail(c.id));return button;
   }
   function renderList(active,dates) {
@@ -85,7 +95,7 @@
   function detail(id) {
     const c=state.courses.find(x=>x.id===id);if(!c)return;
     const host=$('courseDetail');host.replaceChildren();host.append(el('h3','detail-name',c.name));
-    const rows=[['星期',DAY[c.day]],['节次','第 '+c.start+'–'+c.end+' 节'],['时间',state.times[c.start-1][0]+'–'+state.times[c.end-1][1]],['周次',T.formatWeeks(c.weeks)+' 周'],['地点',c.room||'尚未填写'],['教师',c.teacher||'尚未填写']];
+    const rows=[['所选周','第 '+week+' 周'+(c.weeks.includes(week)?'上课':'不上课（非本周）')],['星期',DAY[c.day]],['节次','第 '+c.start+'–'+c.end+' 节'],['时间',state.times[c.start-1][0]+'–'+state.times[c.end-1][1]],['周次',T.formatWeeks(c.weeks)+' 周'],['地点',c.room||'尚未填写'],['教师',c.teacher||'尚未填写']];
     for(const [key,value] of rows)host.append(append(el('div','detail-row'),el('span','',key),el('span','',value)));
     const actions=el('div','detail-actions'), edit=el('button','button primary','修改课程'), del=el('button','button danger','删除课程');
     edit.onclick=()=>{closeDialog('courseDialog');openEdit(c);};

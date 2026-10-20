@@ -1,6 +1,6 @@
 {
   "name": "ytu-timetable",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "烟大随课：安卓离线课表、URP 文件导入与周次切换",
   "scripts": {

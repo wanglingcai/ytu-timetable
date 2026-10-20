@@ -92,3 +92,17 @@ test('工作表实际范围从第 4 行开始时仍正确对应合并单元格',
   const result=T.parseWorkbook({SheetNames:['课表'],Sheets:{课表:sheet}},XLSX);
   assert.equal(result.courses.length,1);assert.equal(result.courses[0].end,2);
 });
+test('周视图保留所有安排并标注非本周，不修改持久化课程或实际周次',()=>{
+  const courses=[makeCourse({name:'单周',weeks:[1,3,5]}),makeCourse({name:'双周',weeks:[2,4,6]}),makeCourse({name:'短期',weeks:[8,9]})];
+  const original=JSON.stringify(courses),view=T.coursesForWeekView(courses,2);
+  assert.equal(view.length,3);assert.equal(view.filter(c=>c.isActive).length,1);assert.equal(view[0].name,'双周');
+  assert.equal(T.coursesInWeek(courses,2).length,1);assert.equal(JSON.stringify(courses),original);
+  assert.deepEqual(T.coursesForWeekView(courses,20).map(c=>c.isActive),[false,false,false]);
+});
+test('同一时段的单双周课程上下显示，本周课程在前且不触发虚假冲突',()=>{
+  const inactive=makeCourse({id:'a',weeks:[1,3]}),active=makeCourse({id:'z',weeks:[2,4]});
+  const view=T.coursesForWeekView([inactive,active],2),positions=T.layoutCourses(view);
+  const a=positions.get(active.id),b=positions.get(inactive.id);
+  assert.equal(a.stackKey,b.stackKey);assert.equal(a.stackOffset,0);assert.equal(b.stackOffset,a.stackSize);
+  assert.ok(a.stackSize>b.stackSize);assert.equal(a.stackSize+b.stackSize,1);assert.equal(T.findConflicts([inactive,active]).length,0);
+});

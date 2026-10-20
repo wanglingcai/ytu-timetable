@@ -21,21 +21,21 @@ test('安卓尺寸：空态、文件预览、周次筛选、刷新后仍有课�
   await expect(page.locator('#toast')).toContainText('勾选');
   await page.locator('#importStart').fill('2026-08-31');await page.locator('#reviewCheck').check();await page.locator('#saveImport').click();
   await page.locator('#weekSelect').selectOption('3');
-  await expect(page.locator('.course-card')).toHaveCount(3);
+  await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(3);
   await expect(page.locator('.course-card').filter({hasText:'指定周'})).toHaveCount(1);
   await page.locator('#weekSelect').selectOption('8');
-  await expect(page.locator('.course-card')).toHaveCount(2);
-  await expect(page.locator('.course-card').filter({hasText:'单周'})).toHaveCount(0);
+  await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(2);
+  await expect(page.locator('.course-card.inactive').filter({hasText:'单周'})).toHaveCount(1);
   await page.screenshot({path:'test-results/schedule-phone.png',fullPage:true});
   await page.reload();await expect(page.locator('#emptyState')).not.toBeVisible();
-  await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.course-card')).toHaveCount(4);
-  await page.locator('#viewToggle').click();await expect(page.locator('#listView .list-card')).toHaveCount(4);
+  await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(4);
+  await page.locator('#viewToggle').click();await expect(page.locator('#listView .list-card:not(.inactive)')).toHaveCount(4);
   await page.locator('#listView .list-card').first().click();await expect(page.locator('#courseDialog')).toBeVisible();
   expect(errors).toEqual([]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('二进制 XLS、HTML、CSV 均可通过真实文件选择导入',async({page})=>{
-  for(const filename of ['模拟URP网格.xls','模拟URP网格.html','课程清单模板.csv']){await page.goto('/');await importAndSave(page,filename);await page.locator('#weekSelect').selectOption('3');await expect(page.locator('.course-card')).toHaveCount(filename.endsWith('.csv')?4:3);}
+  for(const filename of ['模拟URP网格.xls','模拟URP网格.html','课程清单模板.csv']){await page.goto('/');await importAndSave(page,filename);await page.locator('#weekSelect').selectOption('3');await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(filename.endsWith('.csv')?4:3);}
 });
 test('设置校验、修改课程、备份恢复、失败导入不覆盖原数据',async({page})=>{
   await page.goto('/');await importAndSave(page);
@@ -58,4 +58,24 @@ test('恶意课程名仅显示为文本，应用不发起外部请求',async({pa
   await page.goto('/');
   const csv='课程名称,星期,节次,周次,教室\n"<img src=x onerror=alert(1)>",星期一,1-2,1-20,A101';
   await page.locator('#fileInput').setInputFiles({name:'文本安全.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});await expect(page.locator('#previewList')).toContainText('<img src=x onerror=alert(1)>');expect(await page.locator('#previewList img').count()).toBe(0);expect(remote).toEqual([]);
+});
+test('非本周灰色显示，单双周同位置都可点击，无课周保留参考安排',async({page})=>{
+  await page.goto('/');
+  const csv='课程名称,星期,节次,周次,教室\n双周正课,星期一,1-2,1-18双周,A101\n单周参考课,星期一,1-2,1-18单周,B202\n已结束课程,星期三,3-4,1-3,C303\n尚未开始课程,星期五,5-6,12-16,D404';
+  await page.locator('#fileInput').setInputFiles({name:'周次显示.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await expect(page.locator('#previewList .list-card')).toHaveCount(4);
+  await page.locator('#importStart').fill('2026-08-31');await page.locator('#reviewCheck').check();await page.locator('#saveImport').click();
+  await page.locator('#weekSelect').selectOption('8');
+  await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(1);await expect(page.locator('.course-card.inactive')).toHaveCount(3);
+  await expect(page.locator('#scheduleHeading')).toHaveText('本周安排 · 1 项');await expect(page.locator('#conflictNotice')).not.toBeVisible();
+  const active=page.locator('.course-card:not(.inactive)'),odd=page.locator('.course-card.inactive').filter({hasText:'单周参考课'});
+  const activeBounds=await active.boundingBox(),oddBounds=await odd.boundingBox();expect(activeBounds.y+activeBounds.height).toBeLessThanOrEqual(oddBounds.y+1);expect(activeBounds.width).toBeGreaterThan(35);expect(activeBounds.height).toBeGreaterThan(oddBounds.height);
+  expect(await odd.evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgb(237, 240, 233)');
+  await odd.click();await expect(page.locator('#courseDetail')).toContainText('第 8 周不上课（非本周）');await expect(page.locator('#courseDetail')).toContainText('B202');
+  await page.locator('#courseDialog .close-dialog').click();await page.locator('#toast').evaluate(n=>n.hidden=true);
+  await page.screenshot({path:'test-results/inactive-courses-phone.png',fullPage:true});
+  await page.locator('#viewToggle').click();await expect(page.locator('#listView .list-card')).toHaveCount(4);await expect(page.locator('#listView .list-card.inactive')).toHaveCount(3);
+  await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.course-card:not(.inactive)')).toContainText('单周参考课');
+  await page.locator('#weekSelect').selectOption('20');await expect(page.locator('.course-card.inactive')).toHaveCount(4);await expect(page.locator('#noWeekCourses')).toBeVisible();await expect(page.locator('#scheduleHeading')).toHaveText('本周安排 · 0 项');
+  await page.reload();expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('ytu-timetable-v1')))).courses).toHaveLength(4);
 });
