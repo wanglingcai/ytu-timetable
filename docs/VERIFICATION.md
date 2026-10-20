@@ -2,6 +2,12 @@
 
 验证日期：2026-10-20（Asia/Shanghai）。初版使用自造模拟课表；另在本机核对过一份图片型 PDF，经人工转换后验证了 CSV 导入。个人数据和专用核对记录不上传 GitHub。
 
+## 0.1.2 更名检查
+
+软件显示名称由“烟大随课”更名为“下节啥课”，页面标题、页眉页脚、备份文件名与错误提示同步更新。安装包为 `deliverables/next-class-0.1.2-debug.apk`，已核对 APK 的应用标签为“下节啥课”、版本号 0.1.2、versionCode 3。
+
+应用 ID、签名、私有文件名、浏览器存储键和 JSON schemaVersion 均保持原值。从已保存课表的 0.1.1 模拟器覆盖安装 0.1.2 后，4 项升级检查通过；安装前后私有课表文件内容完全一致。5 项通用手机尺寸浏览器测试通过，截图已同步为新名称。构建与 Lint 通过。
+
 ## 交付状态
 
 | 要求 | 当前证据 | 状态 |
@@ -71,8 +77,8 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 
 - [首次打开空态](empty-phone.png)
 - [周视图](schedule-phone.png)
-- [安卓原生文件导入预览](android-import-preview.png)
-- [0.1.1 非本周课程灰色显示](inactive-courses-phone.png)
+- [安卓原生文件导入预览（初版历史截图）](android-import-preview.png)
+- [非本周课程灰色显示（当前名称）](inactive-courses-phone.png)
 
 ## PDF 后续范围
 

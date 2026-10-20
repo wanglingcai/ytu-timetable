@@ -17,7 +17,7 @@ try {
     & '.\gradlew.bat' ':app:assembleDebug' ':app:lintDebug' '--console=plain'
     if ($LASTEXITCODE -ne 0) { throw 'Android 构建或 Lint 检查失败。' }
     New-Item -ItemType Directory -Path 'deliverables' -Force | Out-Null
-    $taskApkName = 'ytu-timetable-'+$taskVersion+'-debug.apk'
+    $taskApkName = 'next-class-'+$taskVersion+'-debug.apk'
     Copy-Item -LiteralPath 'app\build\outputs\apk\debug\app-debug.apk' -Destination (Join-Path 'deliverables' $taskApkName) -Force
     $taskChecksums = Get-ChildItem -LiteralPath 'deliverables' -Filter '*.apk' | Sort-Object Name | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower()+'  '+$_.Name }
     Set-Content -LiteralPath 'deliverables\SHA256SUMS.txt' -Value $taskChecksums -Encoding ascii

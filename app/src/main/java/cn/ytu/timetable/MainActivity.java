@@ -129,7 +129,7 @@ public final class MainActivity extends Activity {
             pendingBackup = json;
             runOnUiThread(() -> {
                 Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE);
-                save.putExtra(Intent.EXTRA_TITLE, "烟大随课-备份.json");
+                save.putExtra(Intent.EXTRA_TITLE, "下节啥课-备份.json");
                 try { startActivityForResult(save, SAVE_BACKUP); }
                 catch (Exception failed) { error("无法打开备份保存窗口。"); }
             });

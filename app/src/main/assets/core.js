@@ -280,7 +280,7 @@
     return {schemaVersion:1,semester:'我的课表',startDate:dateString(mondayOf(now)),totalWeeks:20,times:DEFAULT_TIMES.map(x=>x.slice()),courses:[],sourceName:'',savedAt:''};
   }
   function validateState(raw) {
-    if (!raw || raw.schemaVersion!==1 || !Array.isArray(raw.courses)) throw new Error('不是有效的烟大随课备份（版本 1）');
+    if (!raw || raw.schemaVersion!==1 || !Array.isArray(raw.courses)) throw new Error('不是有效的下节啥课备份（版本 1）');
     parseDate(raw.startDate);
     if (parseDate(raw.startDate).getDay()!==1) throw new Error('学期第一周必须从周一开始');
     if (!Number.isInteger(raw.totalWeeks)||raw.totalWeeks<1||raw.totalWeeks>60) throw new Error('学期周数应为 1–60');

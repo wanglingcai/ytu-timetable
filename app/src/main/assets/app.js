@@ -121,7 +121,7 @@
   function backup() {
     const json=JSON.stringify(state,null,2);
     if(window.AndroidLocal)AndroidLocal.exportBackup(json);
-    else {const a=el('a');const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.href=url;a.download='烟大随课-备份.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    else {const a=el('a');const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.href=url;a.download='下节啥课-备份.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   }
   function chooseFile(){if(window.AndroidLocal)AndroidLocal.importFile();else $('fileInput').click();}
   async function receiveBytes(name,bytes) {
