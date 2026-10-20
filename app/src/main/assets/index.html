@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#f7f7f1">
+  <title>烟大随课 · 离线课程表</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/xlsx.full.min.js" defer></script>
+  <script src="core.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">随</span><div><div class="eyebrow">YOUR DAY, AT A GLANCE</div><h1>烟大随课<span class="personal">个人版</span></h1></div></div>
+      <span class="local-badge"><i></i>本地保存</span>
+    </header>
+    <div class="toolbar"><div><p class="muted" id="semesterLabel">个人离线课表</p><p class="small" id="saveLabel">不加载广告 · 不需要登录</p></div><div class="actions"><button id="importButton" class="button primary">＋ 导入课表</button><button id="settingsButton" class="icon-button" aria-label="学期与时间设置">⚙</button></div></div>
+    <section class="week-card" aria-label="周次选择">
+      <div class="week-main"><button id="prevWeek" class="nav-button" aria-label="上一周">‹</button><div><label class="sr-only" for="weekSelect">选择周次</label><select id="weekSelect"></select><p id="weekRange" class="small"></p></div><button id="nextWeek" class="nav-button" aria-label="下一周">›</button></div>
+      <button id="todayButton" class="button soft">回到本周</button>
+    </section>
+    <p id="semesterNotice" class="notice" hidden></p>
+    <section id="emptyState" class="empty-state">
+      <div class="empty-art" aria-hidden="true"><div class="mini-calendar"><span></span><span></span><span></span><span></span><span></span><span></span></div><span class="sun">✦</span></div>
+      <div class="eyebrow">LESS NOISE. MORE CLARITY.</div><h2>课表在手，安排心里有数。</h2><p>导入一次，离线查看整个学期。<br>每次打开，直接看到下一节课。</p>
+      <button id="emptyImport" class="button primary large">选择课表文件</button>
+      <div class="import-steps"><span><b>01</b>教务系统导出</span><span><b>02</b>校对导入结果</span><span><b>03</b>随时打开查看</span></div>
+      <p class="small">支持 Excel、CSV、HTML 和本应用 JSON 备份<br>烟台大学原始导出格式仍待实文件验证</p>
+      <button id="sampleButton" class="text-button">先体验示例课表 →</button>
+    </section>
+    <section id="scheduleSection" hidden>
+      <div class="section-heading"><h2 id="scheduleHeading">本周安排</h2><button id="viewToggle" class="text-button">切换列表</button></div>
+      <p id="conflictNotice" class="notice warning" hidden></p>
+      <div id="gridView" class="schedule-wrap"><div id="scheduleGrid" class="schedule-grid"></div></div>
+      <div id="listView" hidden></div>
+      <div id="noWeekCourses" class="quiet-card" hidden>这一周没有课程，留点时间给自己。<button id="allCoursesButton" class="text-button">查看全部课程</button></div>
+      <p class="small schedule-hint">点击课程查看详情 · 所有周次均以学期设置为准</p>
+      <div class="bottom-actions"><button id="addCourseButton" class="button soft">＋ 添加课程</button><button id="allButton" class="button soft">全部课程</button><button id="backupButton" class="button soft">导出备份</button></div>
+    </section>
+    <footer>烟大随课 <span>·</span> 让课表回归课表 <span>·</span> v0.1.0</footer>
+  </main>
+  <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.html,.htm,.json" hidden>
+  <dialog id="importDialog"><div class="dialog-head"><div><p class="eyebrow">IMPORT PREVIEW</p><h2>确认你的课表</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><p id="importFileName" class="small wrap"></p><div id="importSummary" class="summary-row"></div><div id="importWarnings" class="notice warning" hidden></div><label>学期名称<input id="importSemester" maxlength="80" placeholder="例如：2026–2027 学年第一学期"></label><div class="field-row"><label>第一周周一<input id="importStart" type="date" required></label><label>学期总周数<input id="importWeeks" type="number" min="1" max="60" required></label></div><p class="small">第一周日期和节次时间需要自行核对；默认时间表依据截图填写。保存会替换当前课表，原数据可先导出备份。</p><div class="confirm-row"><input id="reviewCheck" type="checkbox"><label for="reviewCheck">我已核对周次、日期和下方课程；知晓未识别的记录不会导入</label></div><div id="previewList" class="course-list"></div><div class="dialog-actions"><button id="cancelImport" class="button soft">取消</button><button id="saveImport" class="button primary">保存到手机</button></div></dialog>
+  <dialog id="settingsDialog"><div class="dialog-head"><div><p class="eyebrow">SEMESTER SETTINGS</p><h2>学期与时间</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><form id="settingsForm"><label>学期名称<input id="semesterInput" maxlength="80" required></label><div class="field-row"><label>第一周周一<input id="startInput" type="date" required></label><label>学期总周数<input id="weeksInput" type="number" min="1" max="60" required></label></div><p class="small">第一周周一决定“本周”的计算。开学日不是周一时，请填该周周一。</p><h3>节次时间</h3><p class="small">默认时间来自你提供的截图，第 12 节为待核对的预设时间；可按实际作息修改。</p><div id="timeInputs"></div><div class="time-actions"><button id="addTimeButton" type="button" class="text-button">＋ 增加一节</button><button id="removeTimeButton" type="button" class="text-button">减少末节</button></div><div class="dialog-actions"><button type="button" id="clearButton" class="button danger">清空课表</button><button class="button primary" type="submit">保存设置</button></div></form><p class="small">数据只保存在本机，卸载或清除应用数据前请导出备份。应用不会自动获知学校调课。</p><p class="small">Excel 解析：SheetJS CE 0.20.3 · Apache-2.0</p></dialog>
+  <dialog id="courseDialog"><div class="dialog-head"><h2 id="courseDialogTitle">课程详情</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div><div id="courseDetail"></div></dialog>
+  <dialog id="editDialog"><div class="dialog-head"><h2 id="editTitle">添加课程</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div><form id="courseForm"><label>课程名称<input id="courseName" maxlength="160" required></label><div class="field-row"><label>教师<input id="courseTeacher" maxlength="160"></label><label>教室<input id="courseRoom" maxlength="300"></label></div><div class="field-row"><label>星期<select id="courseDay"><option value="1">星期一</option><option value="2">星期二</option><option value="3">星期三</option><option value="4">星期四</option><option value="5">星期五</option><option value="6">星期六</option><option value="7">星期日</option></select></label><label>节次<input id="courseSections" placeholder="例如 1-2" required></label></div><label>上课周次<input id="courseWeeks" placeholder="例如 1-17 或 1-18单周 或 3,8-10" required></label><p class="small">支持连续周、单双周和离散周次。超出学期或节次设置时会提示。</p><div class="dialog-actions"><button type="button" class="button soft" id="cancelEdit">取消</button><button type="submit" class="button primary">保存课程</button></div></form></dialog>
+  <dialog id="allDialog"><div class="dialog-head"><div><p class="eyebrow">ALL COURSES</p><h2>全部课程</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><p class="small">包含所有周次的课程，点击查看、修改或删除。</p><div id="allList" class="course-list"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

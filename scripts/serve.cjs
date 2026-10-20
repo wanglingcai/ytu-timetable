@@ -1,0 +1,4 @@
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'../app/src/main/assets');
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.txt':'text/plain; charset=utf-8'};
+http.createServer((req,res)=>{try{const url=new URL(req.url,'http://127.0.0.1'),relative=decodeURIComponent(url.pathname);const filename=path.resolve(root,'.'+(relative==='/'?'/index.html':relative));if(filename!==root&&!filename.startsWith(root+path.sep)){res.writeHead(403).end();return;}fs.readFile(filename,(error,data)=>{if(error){res.writeHead(404).end();return;}res.setHeader('Content-Type',types[path.extname(filename)]||'application/octet-stream');res.setHeader('Cache-Control','no-store');res.end(data);});}catch(error){res.writeHead(400).end();}}).listen(4173,'127.0.0.1',()=>console.log('课表预览：http://127.0.0.1:4173'));

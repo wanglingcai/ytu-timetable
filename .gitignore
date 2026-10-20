@@ -1,0 +1,17 @@
+.tools/
+.gradle/
+local.properties
+**/build/
+node_modules/
+test-results/
+*.jks
+*.keystore
+tmp/
+/选课结果.pdf
+/deliverables/烟台大学-已核对课表.csv
+/scripts/make-personal-import.cjs
+/tests/ui/personal-import.spec.cjs
+/docs/PDF_IMPORT.md
+.env
+.env.*
+!.env.example
