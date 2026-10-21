@@ -43,3 +43,10 @@ test('同源嵌入课表及无固定类名的段落可读取，缺少 Array.at �
   await expect(page.locator('#previewList .list-card')).toHaveCount(2);
   await expect(page.locator('#previewList')).toContainText('教师甲 教师乙');
 });
+
+test('手机版仅显示课程名或卡片位于表格外时，不误报未排课',async({page})=>{
+  await page.setContent('<table id="courseTable"><tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th></tr><tr><th>第1小节</th><td></td><td></td><td></td></tr></table><div class="div-kcb-1">模拟课程_01</div>');
+  const result=JSON.parse(await page.evaluate(extract=>eval(extract),extract));
+  expect(result.code).toBe('MOBILE_DETAILS');
+  expect(result.error).toContain('页面已显示课程');expect(result.error).not.toContain('未排课');
+});

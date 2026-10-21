@@ -63,7 +63,12 @@
         c+=cs;
       }
     }
-    if(!cards)return fail('课表网格中尚无可读取的上课信息，可能仍在加载或该学期未排课。','EMPTY_TABLE',true);
+    if(!cards) {
+      var hasNames=false,gridCells=table.querySelectorAll('td');
+      for(var z=0;z<gridCells.length;z++)if(valueOf(gridCells[z]))hasNames=true;
+      for(var q=0;q<docs.length;q++)if(docs[q].querySelector('.class_div,[class*="div-kcb-"],[class*="p-kcm-"]'))hasNames=true;
+      return hasNames ? fail('页面已显示课程，但当前手机版网格未提供可读取的完整周次和节次，官网数据查询也未完成。请重开选课结果后再试。','MOBILE_DETAILS',true) : fail('尚未读取到课程内容，请确认课表已加载。','EMPTY_TABLE',true);
+    }
     var heading=tableDoc.getElementById('h4_id1');
     var missing=(heading?valueOf(heading):'').match(/(\d+)门课程未显示/);
     var warnings=missing&&Number(missing[1])>0 ? ['官网提示有 '+missing[1]+' 门课程未在网格显示，本次只读取网格内有明确时间的安排，请另行核对。'] : [];

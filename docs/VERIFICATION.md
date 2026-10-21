@@ -2,6 +2,16 @@
 
 更新日期：2026-10-21（Asia/Shanghai）。初版及 0.1.2 的检查于 2026-10-20 完成，0.2.0 检查跨至 2026-10-21。初版使用自造模拟课表；另在本机核对过一份图片型 PDF，经人工转换后验证了 CSV 导入。个人数据和专用核对记录不上传 GitHub。
 
+## 0.2.2 已显示课程仍误报 EMPTY_TABLE 的处理
+
+- 用户截图确认手机已显示课程，0.2.1 却返回 `EMPTY_TABLE`。这能证明 DOM 提取器未读出卡片，不能证明学校未排课或尚未加载；仅凭截图尚不能确定手机 DOM 的具体层级差异。
+- 从用户保存的官网页面脚本中确认，`searchSemester()` 会 GET `/student/courseSelect/thisSemesterCurriculum/callback`，读取 `xkxx[0]` 的课程和 `timeAndPlaceList` 再渲染网格。0.2.2 因此改为点击读取后优先查询该固定 HTTPS 接口，使用当前学校登录会话；若没有会话或接口失败，再尝试 DOM 提取。
+- 请求不跟随重定向，限制连接、读取时间和响应大小；不记录 Cookie 或响应到日志、文件、备份。响应只转换课表所需字段，忽略培养计划等元数据。实际周次直接使用 `weekDescription`，未安排明确时间的记录给出核对提示，不补成整学期。
+- 新增仅包含模拟数据的 Android 测试资源 `app/src/androidTest/assets/urp-response.json`，验证多门课程、多时段、单双周、多位教师、未排课提示和附加字段过滤。模拟响应转换后进入同一预览；非课表响应不会生成空课表。测试资源不打包进主 APK。
+- 页面只有课程名、或课程卡片位于表格外且无法提取完整时间时，返回 `MOBILE_DETAILS`，并附带接口失败代码，不再直接提示“可能未排课”。
+- 20 项核心测试、9 项通用浏览器测试通过；本机另有 2 项私有文件测试通过。Android 15 模拟器 18 项原生检查通过。从 0.2.1 覆盖安装 0.2.2，私有课表文件逐字节不变，4 项升级检查通过。构建、Lint 通过。
+- **验证边界**：接口路径和数据字段来自官网页面脚本，响应转换与返回预览使用模拟 JSON 验证；没有取得用户真实登录接口响应，未验证真实会话下的 HTTP 查询和手机最终导入，不宣称截图中的问题已在实体手机上解决。
+
 ## 0.2.1 手机反馈修正
 
 - 用户在 0.2.0 手机上已能短信登录、进入选课结果并看到课程，但拼图验证码不显示，读取提示没有有效课程。检查学校当前公开登录脚本，确认它会加载 `cstaticdun.126.net` 等网易易盾资源；旧版将所有外部子资源拦截，确实会阻止这些脚本。0.2.1 将主页面导航和子资源规则分开，只为易盾相关 HTTPS 脚本、图片和接口增加规则，主页面仍限定为教务和统一认证站点。
@@ -56,7 +66,7 @@ npm.cmd test
 
 0.1.1 新增非本周课程的视图标记、原数据不变、同一时段本周/非本周卡片上下排列与本周优先、单双周不误报冲突的校验。
 
-### 手机尺寸浏览器测试：仓库通用测试 8 项通过
+### 手机尺寸浏览器测试：仓库通用测试 9 项通过
 
 ```powershell
 npm.cmd run test:ui
@@ -70,7 +80,7 @@ npm.cmd run test:ui
 
 0.2.0 新增两项通用官网 DOM 提取和失败处理测试，覆盖密码框及个人资料不被采集、同格多门课程、合并行、多位教师、未显示课程提示、预览确认与保存、失败不覆盖数据。另增加本机真实选课网页的独立测试，不随仓库分发。
 
-### Android 原生 Instrumentation：15 项通过，覆盖安装检查 4 项通过
+### Android 原生 Instrumentation：18 项通过，覆盖安装检查 4 项通过
 
 使用 Android 15（API 35）、x86_64、Pixel 6 模拟器和系统 WebView。测试验证首次空态、原生流读取 CSV、私有目录写入、单双/指定周、非本周灰色卡片与详情标记、Activity 重建恢复、详情对话框和手机布局。
 
@@ -87,7 +97,7 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 & $taskAdb -s emulator-5554 shell am instrument -w cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
 ```
 
-成功输出：`PASS: 15 Android checks`。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
+成功输出：`PASS: 18 Android checks`。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
 
 ## 构建与交付检查
 

@@ -90,11 +90,30 @@ public final class SmokeInstrumentation extends Instrumentation {
             runOnMainSync(()->remote.loadDataWithBaseURL(PortalImportActivity.RESULT_URL,delayed,"text/html","UTF-8",PortalImportActivity.RESULT_URL));
             await("document.readyState==='complete'");
             check("typeof AndroidLocal==='undefined'", "官网 WebView 无本地存储桥接接口");
+            CountDownLatch cookiesCleared=new CountDownLatch(1);
+            runOnMainSync(()->android.webkit.CookieManager.getInstance().removeAllCookies(value->cookiesCleared.countDown()));
+            if(!cookiesCleared.await(5,TimeUnit.SECONDS))throw new AssertionError("Mock cookie cleanup timed out");
             runOnMainSync(()->findReadButton(activity.getWindow().getDecorView()).performClick());
             activity=offline;
             await("document.querySelector('#importDialog').open");
             check("document.querySelectorAll('#previewList .list-card').length===1 && document.querySelector('#previewList').textContent.includes('模拟教师')", "原生读取自动等待异步课程，Activity 结果进入课表预览");
             check("JSON.parse(AndroidLocal.readState()).courses.length===3", "官网读取只打开预览，未确认前不覆盖已有课表");
+            js("document.querySelector('#cancelImport').click();true");
+            final org.json.JSONObject apiPayload;
+            try(java.io.InputStream fixture=getContext().getAssets().open("urp-response.json")) {
+                String json=new java.util.Scanner(fixture,"UTF-8").useDelimiter("\\A").next();
+                apiPayload=PortalCourseData.toPayload(new org.json.JSONObject(json));
+            }
+            if(apiPayload.getJSONArray("rows").length()!=4 || apiPayload.getJSONArray("warnings").length()!=1
+                || apiPayload.toString().contains("FAKE-NOT-TO-KEEP") || apiPayload.toString().contains("mock-private-field"))throw new AssertionError("API fixture mapping or field filtering");
+            checks++;report.append("✓ 官网接口模拟响应转换三条安排，仅保留课表字段\n");
+            boolean invalidRejected=false;
+            try{PortalCourseData.toPayload(new org.json.JSONObject("{\"unrelated\":true}"));}catch(PortalCourseData.InvalidData expected){invalidRejected=true;}
+            if(!invalidRejected)throw new AssertionError("Unexpected API response accepted");
+            checks++;report.append("✓ 非课表接口响应被拒绝，不生成空课表\n");
+            runOnMainSync(()->((MainActivity)activity).onActivityResult(102,Activity.RESULT_OK,new Intent().putExtra("portalTimetable",apiPayload.toString())));
+            await("document.querySelector('#importDialog').open");
+            check("document.querySelectorAll('#previewList .list-card').length===3 && document.querySelector('#previewList').textContent.includes('教师甲 教师乙') && document.querySelector('#previewList').textContent.includes('10-11 周')", "官网结构化响应进入同一导入预览，保留教师和实际周次");
             js("document.querySelector('#cancelImport').click();true");
             result.putString("stream", "\nPASS: " + checks + " Android checks\n" + report);
             finish(Activity.RESULT_OK, result);

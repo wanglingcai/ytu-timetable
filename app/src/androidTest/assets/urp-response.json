@@ -1,0 +1,22 @@
+{
+  "studentAccount": "FAKE-NOT-TO-KEEP",
+  "xkxx": [{
+    "mockA": {
+      "courseName": "模拟课程甲",
+      "id": {"coureSequenceNumber": "01"},
+      "attendClassTeacher": "教师甲* 教师乙*",
+      "timeAndPlaceList": [
+        {"classDay": 2, "classSessions": 1, "continuingSession": 2, "weekDescription": "1-18周单周", "campusName": "模拟校区", "teachingBuildingName": "A楼", "classroomName": "101"},
+        {"classDay": 4, "classSessions": 3, "continuingSession": 2, "weekDescription": "1-8周双周", "campusName": "模拟校区", "teachingBuildingName": "B楼", "classroomName": "202"}
+      ]
+    },
+    "mockB": {
+      "courseName": "模拟实践",
+      "id": {"coureSequenceNumber": "02"},
+      "attendClassTeacher": "教师丙",
+      "timeAndPlaceList": [{"classDay": 6, "classSessions": 11, "continuingSession": 2, "weekDescription": "10-11周", "campusName": "", "teachingBuildingName": "模拟楼", "classroomName": "303"}]
+    },
+    "pending": {"courseName": "模拟未排课", "timeAndPlaceList": []}
+  }],
+  "dateList": [{"ignoredMetadata": "mock-private-field"}]
+}

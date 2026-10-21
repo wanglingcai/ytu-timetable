@@ -26,10 +26,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.net.URL;
+import java.net.SocketTimeoutException;
+import javax.net.ssl.HttpsURLConnection;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Official-site browser, deliberately without the local storage JavaScript bridge. */
 public final class PortalImportActivity extends Activity {
     static final String RESULT_URL = "https://jwxs.ytu.edu.cn/student/courseSelect/courseSelectResult/index";
+    static final String DATA_URL = "https://jwxs.ytu.edu.cn/student/courseSelect/thisSemesterCurriculum/callback";
     static final int MAX_RESULT_BYTES = 240 * 1024;
     private WebView portal;
     private TextView status;
@@ -38,6 +44,9 @@ public final class PortalImportActivity extends Activity {
     private final Handler callbacks = new Handler(Looper.getMainLooper());
     private int readGeneration;
     private boolean collecting;
+    private final ExecutorService network=Executors.newSingleThreadExecutor();
+    private volatile HttpsURLConnection activeConnection;
+    private String apiFailure="";
 
     static boolean allowed(String url) {
         if (url == null) return false;
@@ -147,12 +156,71 @@ public final class PortalImportActivity extends Activity {
         collecting=true;
         read.setEnabled(false);
         final int generation=++readGeneration;
+        apiFailure="";
         callbacks.postDelayed(() -> {
             if (generation==readGeneration && collecting && !isFinishing()) {
                 stopRead(); readError("读取超时，请刷新课表页面后重试。", "TIMEOUT");
             }
-        },10000);
-        collectAttempt(generation,0);
+        },15000);
+        String cookie=CookieManager.getInstance().getCookie(DATA_URL);
+        if(cookie==null || cookie.trim().isEmpty()) {apiFailure="API_NO_SESSION"; collectAttempt(generation,0);}
+        else readOfficialData(generation,cookie,portal.getSettings().getUserAgentString());
+    }
+
+    private void readOfficialData(int generation, String cookie, String userAgent) {
+        status.setText("正在向学校查询完整课表…");
+        network.execute(() -> {
+            JSONObject payload=null;
+            String failure="API_NETWORK";
+            HttpsURLConnection connection=null;
+            try {
+                connection=(HttpsURLConnection)new URL(DATA_URL).openConnection();
+                activeConnection=connection;
+                connection.setInstanceFollowRedirects(false);
+                connection.setConnectTimeout(4000); connection.setReadTimeout(4000);
+                connection.setUseCaches(false);
+                connection.setRequestProperty("Cookie",cookie);
+                connection.setRequestProperty("User-Agent",userAgent);
+                connection.setRequestProperty("Referer",RESULT_URL);
+                connection.setRequestProperty("Accept","application/json");
+                connection.setRequestProperty("X-Requested-With","XMLHttpRequest");
+                int code=connection.getResponseCode();
+                if(code!=200) failure="API_HTTP_"+code;
+                else try(InputStream input=connection.getInputStream()) {
+                    ByteArrayOutputStream output=new ByteArrayOutputStream();
+                    byte[] buffer=new byte[8192]; int count;
+                    while((count=input.read(buffer))!=-1) {
+                        if(output.size()+count>2*1024*1024) throw new PortalCourseData.InvalidData("API_LIMIT");
+                        output.write(buffer,0,count);
+                    }
+                    String json=output.toString(StandardCharsets.UTF_8.name());
+                    if(json.startsWith("\uFEFF"))json=json.substring(1);
+                    payload=PortalCourseData.toPayload(new JSONObject(json));
+                    if(payload.toString().getBytes(StandardCharsets.UTF_8).length>MAX_RESULT_BYTES) {
+                        payload=null;failure="API_LIMIT";
+                    }
+                }
+            } catch(PortalCourseData.InvalidData error) {failure=error.code;}
+            catch(SocketTimeoutException error) {failure="API_TIMEOUT";}
+            catch(org.json.JSONException error) {failure="API_SCHEMA";}
+            catch(Exception error) {failure="API_NETWORK";}
+            finally {if(connection!=null)connection.disconnect();activeConnection=null;}
+            final JSONObject result=payload;
+            final String reason=failure;
+            callbacks.post(() -> {
+                if(generation!=readGeneration || isFinishing() || isDestroyed())return;
+                if(!isResultPage(portal.getUrl())) {stopRead();readError("页面已切换，请重新打开选课结果后读取。","PAGE_CHANGED");return;}
+                if(result!=null) {completeRead(result);return;}
+                apiFailure=reason;
+                collectAttempt(generation,0);
+            });
+        });
+    }
+
+    private void completeRead(JSONObject data) {
+        stopRead();
+        setResult(RESULT_OK,new Intent().putExtra("portalTimetable",data.toString()));
+        finish();
     }
 
     private void collectAttempt(int generation, int attempt) {
@@ -169,12 +237,10 @@ public final class PortalImportActivity extends Activity {
                 JSONObject data = new JSONObject(text);
                 if (data.has("error")) {
                     if (data.optBoolean("retryable") && attempt<6) { callbacks.postDelayed(()->collectAttempt(generation,attempt+1),700); return; }
-                    stopRead(); readError(data.getString("error"),data.optString("code","READ_ERROR")); return;
+                    stopRead(); readError(data.getString("error"),data.optString("code","READ_ERROR")+(apiFailure.isEmpty()?"":"/"+apiFailure)); return;
                 }
                 if (!"ytu-urp".equals(data.getString("source")) || data.getJSONArray("rows").length()>100) throw new IllegalArgumentException();
-                stopRead();
-                setResult(RESULT_OK,new Intent().putExtra("portalTimetable",text));
-                finish();
+                completeRead(data);
             } catch (Exception error) { stopRead(); readError("读取结果格式异常，可先使用已保存的 HTML 文件导入。", "RESULT_FORMAT"); }
         });
     }
@@ -195,6 +261,9 @@ public final class PortalImportActivity extends Activity {
 
     @Override protected void onDestroy() {
         readGeneration++; callbacks.removeCallbacksAndMessages(null);
+        network.shutdownNow();
+        HttpsURLConnection connection=activeConnection;
+        if(connection!=null)connection.disconnect();
         if (portal != null) {
             portal.stopLoading(); portal.clearHistory(); portal.clearFormData(); portal.clearCache(true); portal.destroy();
             CookieManager.getInstance().removeAllCookies(null);
