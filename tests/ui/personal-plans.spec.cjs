@@ -17,7 +17,7 @@ test('点击空白格：单周默认、编辑备注、跨周、备份恢复与�
   await expect(page.locator('#courseDay')).toHaveValue('7');await expect(page.locator('#courseSections')).toHaveValue('5');await expect(page.locator('#courseWeeks')).toHaveValue('8');
   await expect(page.locator('#courseTeacherField')).not.toBeVisible();
   await page.locator('#courseName').fill('图书馆自习');await page.locator('#courseSections').fill('5-6');await page.locator('#courseRoom').fill('图书馆二楼');
-  await page.locator('#entryNotes').fill('复习第三章\n完成习题 <img src=x onerror="window.notesXss=1">');await page.locator('#saveCourse').click();
+  await page.locator('#notesDetails summary').click();await page.locator('#entryNotes').fill('复习第三章\n完成习题 <img src=x onerror="window.notesXss=1">');await page.locator('#saveCourse').click();
   await expect(page.locator('.personal-entry')).toHaveCount(1);
   await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.personal-entry')).toHaveCount(0);
   await page.locator('#weekSelect').selectOption('8');await page.locator('.personal-entry').click();
@@ -25,7 +25,7 @@ test('点击空白格：单周默认、编辑备注、跨周、备份恢复与�
   expect(await page.evaluate(()=>window.notesXss)).toBeUndefined();
   await page.getByRole('button',{name:'修改安排',exact:true}).click();
   await expect(page.locator('#entryNotes')).toHaveValue(/复习第三章/);
-  await page.locator('#courseWeeks').fill('8-10');await page.locator('#entryNotes').fill('复习数学\n整理错题');await page.locator('#saveCourse').click();
+  await page.locator('#repeatCustom').click();await page.locator('#courseWeeks').fill('8-10');await page.locator('#entryNotes').fill('复习数学\n整理错题');await page.locator('#saveCourse').click();
   await page.reload();await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.personal-entry')).toHaveCount(1);
   const downloadPromise=page.waitForEvent('download');await page.locator('#backupButton').click();const download=await downloadPromise;
   const backup=JSON.parse(fs.readFileSync(await download.path(),'utf8'));expect(backup.courses.find(c=>c.kind==='personal').notes).toBe('复习数学\n整理错题');

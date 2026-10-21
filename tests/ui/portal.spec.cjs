@@ -28,7 +28,7 @@ test('官网尚未加载或空课表时返回明确错误，桌面预览引导�
   expect(missing.error).toContain('尚未找到课表');
   await page.evaluate(()=>{const t=document.createElement('table');t.id='courseTable';document.body.append(t);});
   const empty=JSON.parse(await page.evaluate(extract=>eval(extract),extract));expect(empty.code).toBe('EMPTY_TABLE');expect(empty.retryable).toBe(true);
-  await page.locator('#portalImport').click();await expect(page.locator('#toast')).toContainText('安卓应用');
+  await page.locator('#importButton').click();await page.locator('#portalImport').click();await expect(page.locator('#toast')).toContainText('安卓应用');
 });
 
 test('同源嵌入课表及无固定类名的段落可读取，缺少 Array.at 时仍能预览',async({page})=>{

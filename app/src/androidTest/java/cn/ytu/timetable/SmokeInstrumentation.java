@@ -119,6 +119,21 @@ public final class SmokeInstrumentation extends Instrumentation {
             js("document.querySelector('#cancelImport').click();true");
             js("document.querySelector('.empty-slot[data-day=\"7\"][data-section=\"5\"]').click();true");
             check("document.querySelector('#editDialog').open && document.querySelector('#courseDay').value==='7' && document.querySelector('#courseSections').value==='5' && document.querySelector('#courseWeeks').value==='3'", "空白格打开个人安排并预填星期、节次和所选周");
+            await("Math.abs(document.querySelector('#editDialog').getBoundingClientRect().bottom-innerHeight)<2");
+            check("Math.abs(document.querySelector('#editDialog').getBoundingClientRect().bottom-innerHeight)<2 && document.querySelector('#repeatOnce').getAttribute('aria-pressed')==='true' && document.querySelector('#customWeeksField').hidden && !document.querySelector('#notesDetails').open", "安卓底部添加面板默认单周，备注和自定义周次按需展开");
+            double fullHeight=Double.parseDouble(js("innerHeight"));
+            tapElement("#courseName");
+            await("innerHeight<"+(fullHeight-100));
+            String keyboardReady="(function(){var b=document.querySelector('#saveCourse'),r=b.getBoundingClientRect(),h=visualViewport?visualViewport.height:innerHeight;return r.height>0&&r.top>=0&&r.bottom<=h+2&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b;})()";
+            await(keyboardReady);
+            js("window.keyboardStable=false;(function settle(){var last='',since=performance.now();function frame(){var key=[innerHeight,visualViewport.height,document.querySelector('#saveCourse').getBoundingClientRect().bottom].join(':');if(key!==last){last=key;since=performance.now();}if(performance.now()-since>350){window.keyboardStable=true;return;}requestAnimationFrame(frame);}frame();})();true");
+            await("window.keyboardStable");
+            check(keyboardReady, "真实安卓软键盘弹出后保存按钮可见且能接收点击");
+            report.append("  keyboard layout: ").append(js("JSON.stringify({inner:innerHeight,visual:visualViewport.height,panelBottom:document.querySelector('#editDialog').getBoundingClientRect().bottom,saveTop:document.querySelector('#saveCourse').getBoundingClientRect().top,saveBottom:document.querySelector('#saveCourse').getBoundingClientRect().bottom})")).append('\n');
+            android.graphics.Bitmap keyboardShot=getUiAutomation().takeScreenshot();
+            if(keyboardShot!=null)try(java.io.FileOutputStream shot=new java.io.FileOutputStream(new File(getTargetContext().getExternalFilesDir(null),"keyboard-panel.png"))){keyboardShot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,shot);keyboardShot.recycle();}
+            runOnMainSync(()->((android.view.inputmethod.InputMethodManager)getTargetContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(findWeb(activity.getWindow().getDecorView()).getWindowToken(),0));
+            await("innerHeight>"+(fullHeight-10));
             js("document.querySelector('#courseName').value='模拟自习';document.querySelector('#entryNotes').value='复习数学\\n整理错题';document.querySelector('#saveCourse').click();true");
             runOnMainSync(() -> activity.finish());
             waitForIdleSync();launch();await("document.readyState==='complete' && !!window.receiveImport");
@@ -151,6 +166,15 @@ public final class SmokeInstrumentation extends Instrumentation {
         runOnMainSync(()->findWeb(activity.getWindow().getDecorView()).evaluateJavascript(script,reply->{value.set(reply);latch.countDown();}));
         if(!latch.await(10, TimeUnit.SECONDS))throw new AssertionError("JavaScript callback timed out");
         return value.get();
+    }
+    private void tapElement(String selector) throws Exception {
+        String result=js("JSON.stringify((function(){var r=document.querySelector("+org.json.JSONObject.quote(selector)+").getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2,innerWidth];})())");
+        org.json.JSONArray point=new org.json.JSONArray((String)new org.json.JSONTokener(result).nextValue());
+        int[] origin=new int[2];AtomicReference<Integer> width=new AtomicReference<>();
+        runOnMainSync(()->{WebView view=findWeb(activity.getWindow().getDecorView());view.getLocationOnScreen(origin);width.set(view.getWidth());});
+        double scale=width.get()/point.getDouble(2);float x=(float)(origin[0]+point.getDouble(0)*scale),y=(float)(origin[1]+point.getDouble(1)*scale);long time=android.os.SystemClock.uptimeMillis();
+        android.view.MotionEvent down=android.view.MotionEvent.obtain(time,time,android.view.MotionEvent.ACTION_DOWN,x,y,0),up=android.view.MotionEvent.obtain(time,time+80,android.view.MotionEvent.ACTION_UP,x,y,0);
+        sendPointerSync(down);sendPointerSync(up);down.recycle();up.recycle();
     }
     private void await(String expression) throws Exception {
         long deadline=System.currentTimeMillis()+20000;

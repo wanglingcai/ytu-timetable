@@ -46,7 +46,7 @@ test('设置校验、修改课程、备份恢复、失败导入不覆盖原数�
   await page.locator('#settingsButton').click();await page.locator('#startInput').fill('2026-09-01');await page.getByRole('button',{name:'保存设置',exact:true}).click();
   await expect(page.locator('#toast')).toContainText('周一');await expect(page.locator('#settingsDialog')).toBeVisible();
   await page.locator('#startInput').fill('2026-08-31');await page.getByRole('button',{name:'保存设置',exact:true}).click();
-  await page.locator('#addCourseButton').click();await page.locator('#courseName').fill('手动测试课');await page.locator('#courseSections').fill('3-4');await page.locator('#courseWeeks').fill('2,4,8-10');await page.getByRole('button',{name:'保存课程',exact:true}).click();
+  await page.locator('#addButton').click();await page.locator('#addCourseButton').click();await page.locator('#courseName').fill('手动测试课');await page.locator('#courseSections').fill('3-4');await page.locator('#repeatCustom').click();await page.locator('#courseWeeks').fill('2,4,8-10');await page.getByRole('button',{name:'保存课程',exact:true}).click();
   await page.locator('#weekSelect').selectOption('8');await expect(page.locator('.course-card').filter({hasText:'手动测试课'})).toHaveCount(1);
   await page.locator('.course-card').filter({hasText:'手动测试课'}).click();await page.getByRole('button',{name:'修改课程',exact:true}).click();await page.locator('#courseRoom').fill('新增教室');await page.getByRole('button',{name:'保存课程',exact:true}).click();
   const downloadPromise=page.waitForEvent('download');await page.locator('#backupButton').click();const download=await downloadPromise;const file=await download.path();const saved=JSON.parse(fs.readFileSync(file,'utf8'));expect(saved.courses).toHaveLength(6);expect(saved.courses.find(c=>c.name==='手动测试课').room).toBe('新增教室');
@@ -76,6 +76,6 @@ test('非本周灰色显示，单双周同位置都可点击，无课周保留�
   await page.screenshot({path:'test-results/inactive-courses-phone.png',fullPage:true});
   await page.locator('#viewToggle').click();await expect(page.locator('#listView .list-card')).toHaveCount(4);await expect(page.locator('#listView .list-card.inactive')).toHaveCount(3);
   await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.course-card:not(.inactive)')).toContainText('单周参考课');
-  await page.locator('#weekSelect').selectOption('20');await expect(page.locator('.course-card.inactive')).toHaveCount(4);await expect(page.locator('#noWeekCourses')).toBeVisible();await expect(page.locator('#scheduleHeading')).toHaveText('本周安排 · 0 项');
+  await page.locator('#weekSelect').selectOption('20');await expect(page.locator('.course-card.inactive')).toHaveCount(4);await expect(page.locator('#noWeekCourses')).toBeVisible();await expect(page.locator('#scheduleHeading')).toHaveText('第 20 周安排 · 0 项');
   await page.reload();expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('ytu-timetable-v1')))).courses).toHaveLength(4);
 });

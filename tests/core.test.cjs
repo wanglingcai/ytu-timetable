@@ -160,3 +160,26 @@ test('同一时段的单双周课程上下显示，本周课程在前且不触�
   assert.equal(a.stackKey,b.stackKey);assert.equal(a.stackOffset,0);assert.equal(b.stackOffset,a.stackSize);
   assert.ok(a.stackSize>b.stackSize);assert.equal(a.stackSize+b.stackSize,1);assert.equal(T.findConflicts([inactive,active]).length,0);
 });
+
+test('首页下一节按真实日期和周次计算，涵盖进行中、个人安排及学期结束',()=>{
+  const morning=makeCourse({id:'morning',name:'早课',day:3,start:1,end:2,weeks:[8]}),future=makeCourse({id:'future',name:'下周课',day:3,start:1,end:2,weeks:[9]}),plan=makeCourse({id:'personal',kind:'personal',name:'自习',day:3,start:5,end:6,weeks:[8]});
+  const state={...T.defaultState(),startDate:'2026-08-31',courses:[future,morning,plan]};
+  const before=JSON.stringify(state);
+  assert.equal(T.nextOccurrence(state,new Date(2026,9,21,7,30)).course.id,'morning');
+  const ongoing=T.nextOccurrence(state,new Date(2026,9,21,9,0));assert.equal(ongoing.course.id,'morning');assert.equal(ongoing.ongoing,true);
+  assert.equal(T.nextOccurrence(state,new Date(2026,9,21,10,0)).course.id,'personal');
+  const next=T.nextOccurrence(state,new Date(2026,9,21,17,0));assert.equal(next.course.id,'future');assert.equal(next.date,'2026-10-28');assert.equal(next.week,9);
+  assert.equal(T.nextOccurrence(state,new Date(2027,0,1)),null);assert.equal(JSON.stringify(state),before);
+});
+
+test('同课程配色不受导入顺序、旧颜色或记录 ID 影响',()=>{
+  const a=makeCourse({name:'高等数学',id:'a',color:1}),b=makeCourse({name:'高等数学',id:'b',color:7,day:6});
+  assert.equal(T.coursePalette(a),T.coursePalette(b));assert.ok(T.coursePalette(a)>=0&&T.coursePalette(a)<8);
+});
+
+test('当前时间线在上课中按比例定位，课间置于下一节边界，作息外隐藏',()=>{
+  const times=[['08:00','08:40'],['09:00','09:40']];
+  assert.deepEqual(T.timePosition(times,new Date(2026,9,21,8,20)),{section:0,fraction:.5});
+  assert.deepEqual(T.timePosition(times,new Date(2026,9,21,8,50)),{section:1,fraction:0});
+  assert.equal(T.timePosition(times,new Date(2026,9,21,7,50)),null);assert.equal(T.timePosition(times,new Date(2026,9,21,9,40)),null);
+});

@@ -24,7 +24,13 @@ final class ReminderChecks {
     void run(String mode) {
         Bundle result=new Bundle();
         try {
-            if("permissions".equals(mode)) {
+            if("upgradeSeed".equals(mode)) {
+                launch(null);await("!!window.Timetable && !!window.openReminder");
+                JSONObject fixture=new JSONObject((String)new JSONTokener(js("JSON.stringify(Timetable.defaultState())")).nextValue());
+                fixture.put("startDate","2026-08-31").put("semester","模拟升级保留检查");
+                fixture.put("courses",new JSONArray().put(new JSONObject("{\"id\":\"upgrade-school\",\"name\":\"模拟升级课程\",\"room\":\"A101\",\"day\":1,\"start\":1,\"end\":2,\"weeks\":[1,3]}")));
+                save(fixture);result.putString("stream","\nPASS: seeded upgrade fixture (synthetic courses only)\n"+report);
+            } else if("permissions".equals(mode)) {
                 launch(null);await("!!window.Timetable && !!window.openReminder");save(liveFixture(150));
                 check(!ReminderScheduler.notificationsAllowed(context)&&new JSONObject(ReminderScheduler.status(context)).getLong("nextAt")==0,"通知未授权时不安排闹钟，不误报已启用");
                 context.getSharedPreferences("MainActivity",Context.MODE_PRIVATE).edit().remove("notificationAsked").commit();

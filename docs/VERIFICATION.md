@@ -2,6 +2,19 @@
 
 更新日期：2026-10-21（Asia/Shanghai）。初版及 0.1.2 的检查于 2026-10-20 完成，0.2.0 检查跨至 2026-10-21。初版使用自造模拟课表；另在本机核对过一份图片型 PDF，经人工转换后验证了 CSV 导入。个人数据和专用核对记录不上传 GitHub。
 
+## 0.5.0 日常首页、课表和添加面板
+
+- 首页收紧标题、学期和导入入口，新增“接下来/此刻”卡片。按真实日期和实际周次选择最近尚未结束的一项，包含进行中的安排、时间地点和倒计时；查看其他周不改变卡片依据的真实时间，点击卡片跳转到发生日期详情。前台每 30 秒更新，跨日刷新今天标记。
+- 同名课程按名称使用固定配色；今天整列淡绿色、当前时间细线，保留非本周灰色卡片、冲突布局及详情。时间线仅在真实今天所在周和作息范围出现，课间落在下一节边界。
+- 导入统一为选择菜单，学校官网与文件/备份两条路径均保留。底部固定加号可选择个人安排或课程，空课表也能添加；手机编辑器改为底部面板，日期/节次摘要、“仅本周/每周/自定义”、按需展开备注，重复记录编辑保留原周次及提醒。
+- 添加面板的字段区域独立滚动、保存操作固定；原生窗口将输入法高度纳入 WebView 可用区域。Android 15 测试实际点输入框弹出软键盘，等待布局稳定后确认保存按钮在视觉视口内且能接收点击，并检查系统截图。稳定状态下视觉视口约 523 CSS 像素，保存按钮在约 459–505 像素范围。
+- 26 项核心测试通过。18 项仓库通用浏览器测试通过；另有 2 项本机私有样本测试通过，共 20 项。新增测试覆盖真实下一节和进行中切换、独立于浏览周、同名同色、时间线、底部面板、快捷重复周次、备注、取消草稿、菜单导入、Android 返回栈、320/393/768 像素宽度和短视口；设置错误提示在当前面板内可见。
+- Android 15 模拟器 22 项冒烟检查通过；从含非本周课程的 0.4.0 模拟课表覆盖安装 0.5.0，私有数据 SHA-256 一致，4 项升级检查通过。构建、Lint 通过；新首页和添加面板截图均只用模拟数据，见下方图片链接。
+- 36 项原生提醒检查回归通过，包括实际到点通知、关闭界面接收、通知点击冷/热启动详情定位，以及编辑、删除、导入后旧提醒失效；本轮未改变原生提醒计算逻辑。
+- 验证边界：本轮未在用户实体手机上验证新界面与键盘；密集冲突、超长名称仍需点击详情或使用列表查看。课程数据、备注与提醒设置的 JSON 结构保持兼容。本轮没有新增主题切换、任意时间日程或手势拖动排课功能。
+
+新版界面：[首页](daily-home-phone.png) · [添加面板](daily-editor-phone.png)（均为模拟数据）。
+
 ## 0.4.0 课程与个人安排提醒
 
 - 增加原生 `ReminderPlanner`、`ReminderScheduler`、`ReminderReceiver`：按实际学期日期/周次/星期/节次计算，在手机当地时区调度最近一批 `AlarmManager` 闹钟；同刻多项分别通知，触发后继续调度下一批。课程默认提前 10 分钟，可选关闭、准点、5/15/30 分钟；个人安排在编辑器中独立选择，默认关闭。
@@ -74,11 +87,12 @@
 | 空白格个人安排 | 浏览器验证添加/修改/删除、重复周次、备注、备份、同步保留；原生验证保存和重建 | 已验证浏览器与模拟器，实体手机待试用 |
 | 一份实际图片型 PDF 的转换文件 | 本机人工核对后转换 CSV，通过实际导入界面保存、周次筛选和刷新恢复测试；原文件与个人课表不随仓库分发 | **本次转换文件已验证；直接 PDF 导入未实现** |
 | 到点提醒 | 实际系统闹钟投递、关闭界面后接收、通知详情跳转、变更取消与权限流程 | 已验证 Android 15 模拟器，实体手机待试用 |
-| 用户实体安卓手机 | 未直接连接设备；用户反馈 0.2.2 官网读取恢复正常 | 官网读取获反馈，0.4.0 提醒待试用 |
+| 日常首页与添加面板 | 真实周次与时间定位、快捷周次和备注、真实软键盘可视范围、手机尺寸截图 | 已验证浏览器和 Android 15 模拟器 |
+| 用户实体安卓手机 | 未直接连接设备；用户反馈 0.2.2 官网读取恢复正常 | 官网读取获反馈，0.5.0 界面与提醒待试用 |
 
 ## 自动测试
 
-### 解析、日期与数据校验：23 项通过
+### 解析、日期与数据校验：26 项通过
 
 ```powershell
 npm.cmd test
@@ -88,7 +102,7 @@ npm.cmd test
 
 0.1.1 新增非本周课程的视图标记、原数据不变、同一时段本周/非本周卡片上下排列与本周优先、单双周不误报冲突的校验。
 
-### 手机尺寸浏览器测试：仓库通用测试 14 项通过
+### 手机尺寸浏览器测试：仓库通用测试 18 项通过
 
 ```powershell
 npm.cmd run test:ui
@@ -102,7 +116,7 @@ npm.cmd run test:ui
 
 0.2.0 新增两项通用官网 DOM 提取和失败处理测试，覆盖密码框及个人资料不被采集、同格多门课程、合并行、多位教师、未显示课程提示、预览确认与保存、失败不覆盖数据。另增加本机真实选课网页的独立测试，不随仓库分发。
 
-### Android 原生 Instrumentation：20 项通过，覆盖安装检查 4 项通过
+### Android 原生 Instrumentation：22 项通过，覆盖安装检查 4 项通过
 
 使用 Android 15（API 35）、x86_64、Pixel 6 模拟器和系统 WebView。测试验证首次空态、原生流读取 CSV、私有目录写入、单双/指定周、非本周灰色卡片与详情标记、Activity 重建恢复、详情对话框和手机布局。
 
@@ -115,11 +129,14 @@ npm.cmd run test:ui
 $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 & $taskAdb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
 & $taskAdb -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& $taskAdb -s emulator-5554 shell settings put secure show_ime_with_hard_keyboard 1
 & $taskAdb -s emulator-5554 shell pm clear cn.ytu.timetable.personal
 & $taskAdb -s emulator-5554 shell am instrument -w cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
 ```
 
-成功输出：`PASS: 20 Android checks`。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
+成功输出：`PASS: 22 Android checks`。键盘检查需要模拟器开启软键盘；上述 `show_ime_with_hard_keyboard` 设置仅用于专用模拟器。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
+
+本轮最终 APK 的升级检查先在 0.4.0 上运行 `-e reminders upgradeSeed`，通过旧版存储桥接写入日期为 2026-08-31、只在第 1/3 周上课的模拟课程，再覆盖安装 0.5.0；检查当日为第 8 周，具有灰色课程。此模式会替换专用模拟器的数据，仅用于准备升级样本，不应在真实手机运行。安装前后私有文件 SHA-256 一致，最终交付 APK 的 4 项升级检查通过。
 
 ### 安卓提醒专项检查
 
