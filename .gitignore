@@ -8,9 +8,14 @@ test-results/
 *.keystore
 tmp/
 /选课结果.pdf
+/选课结果.html
+/选课结果_files/
+/URP高校教学管理与服务平台（学生）.html
+/URP高校教学管理与服务平台（学生）_files/
 /deliverables/烟台大学-已核对课表.csv
 /scripts/make-personal-import.cjs
 /tests/ui/personal-import.spec.cjs
+/tests/ui/actual-portal.local.spec.cjs
 /docs/PDF_IMPORT.md
 .env
 .env.*

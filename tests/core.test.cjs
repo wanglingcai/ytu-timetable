@@ -60,6 +60,19 @@ test('周次切换按每门课程的实际周次过滤',()=>{
   const courses=[makeCourse({name:'单周',weeks:[1,3,5]}),makeCourse({name:'双周',weeks:[2,4,6]}),makeCourse({name:'短期',weeks:[8,9,10]})];
   assert.deepEqual(T.coursesInWeek(courses,2).map(c=>c.name),['双周']);assert.deepEqual(T.coursesInWeek(courses,9).map(c=>c.name),['短期']);
 });
+
+test('URP 官网保存页只读课表网格，段落区分课程和多位教师并提示未显示课程',()=>{
+  const bytes=fs.readFileSync(path.join(__dirname,'../examples/模拟URP官网.html'));
+  const result=T.readImport(bytes,'选课结果.html',XLSX);
+  assert.equal(result.courses.length,2);
+  assert.equal(result.courses[0].name,'模拟课程甲_01');
+  assert.equal(result.courses[0].teacher,'教师甲 教师乙');
+  assert.deepEqual(result.courses[0].weeks,[1,3,5,7]);
+  assert.deepEqual(result.courses[1].weeks,[10,12,14,16]);
+  assert.equal(result.courses[1].day,2);assert.equal(result.courses[1].room,'模拟楼202');
+  assert.equal(result.warnings.length,1);assert.match(result.warnings[0],/1 门课程未在网格显示/);
+  assert.ok(result.courses.every(c=>!JSON.stringify(c).includes('fake-password')));
+});
 test('学期日期、学期外周次和跨年计算',()=>{
   assert.equal(T.currentWeek('2026-08-31',new Date(2026,9,20)),8);
   assert.equal(T.currentWeek('2026-08-31',new Date(2026,7,30)),0);

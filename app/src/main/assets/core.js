@@ -123,7 +123,7 @@
       }
       try {
         if (!sec) throw new Error('未识别节次');
-        const course=validateCourse({name,teacher:teacher.replace(/\*$/,''),room,day,...sec,weeks:parseWeeks(match[0])}, result.length);
+        const course=validateCourse({name,teacher:teacher.replace(/\*/g,'').trim(),room,day,...sec,weeks:parseWeeks(match[0])}, result.length);
         result.push(course);
       } catch (error) { warnings.push(source + '：' + error.message + '，请核对「' + name + '」。'); }
       consumed = nextConsumed;
@@ -251,13 +251,25 @@
     const head=new TextDecoder().decode(bytes.slice(0,200));
     const isText=['csv','tsv','html','htm'].includes(ext)||/^\s*(?:\uFEFF)?</.test(head);
     let input=isText?decode():bytes;
+    const htmlWarnings=[];
     if(isText && /<(?:html|table|tr|td)\b/i.test(input)) {
+      // A saved URP page also contains hidden lists and script templates.
+      const urpTable=input.match(/<table\b[^>]*\bid\s*=\s*["']courseTable["'][^>]*>[\s\S]*?<\/table\s*>/i);
+      if(urpTable) {
+        const heading=input.match(/<h4\b[^>]*\bid\s*=\s*["']h4_id1["'][^>]*>([\s\S]*?)<\/h4>/i);
+        const missing=heading && heading[1].replace(/<[^>]*>/g,'').match(/(\d+)门课程未显示/);
+        if(missing && +missing[1]>0)htmlWarnings.push('官网提示有 '+missing[1]+' 门课程未在网格显示，本次只读取网格内有明确时间的安排，请另行核对。');
+        input=urpTable[0];
+      }
+      input=input.replace(/<\/p\s*>/gi,'<br>');
       // HTML exporters may include a second, multiline copy of the cell value in data-v.
       // Read the visible table text only; retain rowspan/colspan for the grid coordinates.
       input=input.replace(/<(?:td|th)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi,tag=>tag.replace(/\sdata-[\w-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,''));
     }
     const workbook=XLSX.read(input,{type:isText?'string':'array',cellDates:false,raw:true});
-    return parseWorkbook(workbook,XLSX);
+    const result=parseWorkbook(workbook,XLSX);
+    result.warnings.push(...htmlWarnings);
+    return result;
   }
 
   function parseDate(value) {

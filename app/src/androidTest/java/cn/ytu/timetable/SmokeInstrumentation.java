@@ -9,6 +9,7 @@ import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
+import android.widget.Button;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -62,6 +63,31 @@ public final class SmokeInstrumentation extends Instrumentation {
             check("document.querySelector('#courseDialog').open && document.querySelector('#courseDetail').textContent.includes('B202')", "原生 WebView 中详情对话框可用");
             js("document.querySelector('#courseDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
             check("document.documentElement.scrollWidth<=innerWidth", "手机界面没有横向溢出");
+            if (!PortalImportActivity.allowed("https://cas.ytu.edu.cn/lyuapServer/login")
+                || !PortalImportActivity.isResultPage(PortalImportActivity.RESULT_URL)
+                || PortalImportActivity.allowed("http://jwxs.ytu.edu.cn/")
+                || PortalImportActivity.allowed("https://jwxs.ytu.edu.cn.evil.example/")
+                || PortalImportActivity.allowed("https://cas.ytu.edu.cn@evil.example/")
+                || PortalImportActivity.allowed("https://jwxs.ytu.edu.cn:8443/")
+                || PortalImportActivity.isResultPage("https://cas.ytu.edu.cn/student/courseSelect/courseSelectResult/index")) throw new AssertionError("Portal URL policy");
+            checks++; report.append("✓ 教务网址仅允许两个官方 HTTPS 主机和准确课表路径\n");
+            Activity offline = activity;
+            ActivityMonitor portalMonitor=addMonitor(PortalImportActivity.class.getName(),null,false);
+            js("AndroidLocal.importPortal();true");
+            activity=waitForMonitorWithTimeout(portalMonitor,10000);
+            removeMonitor(portalMonitor);
+            if(activity==null)throw new AssertionError("Portal activity not opened");
+            final WebView remote=findWeb(activity.getWindow().getDecorView());
+            String mock="<table id='courseTable'><tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th></tr><tr><th>第1节</th><td><div class='class_div'><p>官网登录模拟课</p><p>模拟教师*</p><p>1-16周双周</p><p>1-2节</p><p>模拟楼101</p></div></td><td></td><td></td></tr></table>";
+            runOnMainSync(()->remote.loadDataWithBaseURL(PortalImportActivity.RESULT_URL,mock,"text/html","UTF-8",PortalImportActivity.RESULT_URL));
+            await("!!document.getElementById('courseTable')");
+            check("typeof AndroidLocal==='undefined'", "官网 WebView 无本地存储桥接接口");
+            runOnMainSync(()->findReadButton(activity.getWindow().getDecorView()).performClick());
+            activity=offline;
+            await("document.querySelector('#importDialog').open");
+            check("document.querySelectorAll('#previewList .list-card').length===1 && document.querySelector('#previewList').textContent.includes('模拟教师')", "原生官网读取按钮经 Activity 结果进入课表预览");
+            check("JSON.parse(AndroidLocal.readState()).courses.length===3", "官网读取只打开预览，未确认前不覆盖已有课表");
+            js("document.querySelector('#cancelImport').click();true");
             result.putString("stream", "\nPASS: " + checks + " Android checks\n" + report);
             finish(Activity.RESULT_OK, result);
         } catch (Throwable error) {
@@ -77,6 +103,11 @@ public final class SmokeInstrumentation extends Instrumentation {
     private WebView findWeb(View view) {
         if(view instanceof WebView)return (WebView)view;
         if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++){WebView found=findWeb(((ViewGroup)view).getChildAt(i));if(found!=null)return found;}
+        return null;
+    }
+    private Button findReadButton(View view) {
+        if(view instanceof Button && "读取课表".contentEquals(((Button)view).getText()))return (Button)view;
+        if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++){Button found=findReadButton(((ViewGroup)view).getChildAt(i));if(found!=null)return found;}
         return null;
     }
     private String js(String script) throws Exception {

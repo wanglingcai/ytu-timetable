@@ -124,6 +124,20 @@
     else {const a=el('a');const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.href=url;a.download='下节啥课-备份.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   }
   function chooseFile(){if(window.AndroidLocal)AndroidLocal.importFile();else $('fileInput').click();}
+  $('portalImport').onclick=()=>{
+    if(window.AndroidLocal && typeof AndroidLocal.importPortal==='function')AndroidLocal.importPortal();
+    else toast('官网登录导入需要在安卓应用中使用；浏览器预览可导入已保存的 HTML 课表。');
+  };
+  window.receivePortalImport=payload=>{
+    try {
+      if(!payload || payload.source!=='ytu-urp' || !Array.isArray(payload.rows) || payload.rows.length>100 || payload.rows.some(row=>!Array.isArray(row)||row.length>32))throw new Error('教务课表数据结构无效');
+      preview=T.parseMatrix(payload.rows,payload.merges||[],'烟台大学教务系统');
+      if(!preview.courses.length)throw new Error('没有读取到有效课程，原课表未修改。请确认已进入选课结果并等待课程加载。');
+      if(Array.isArray(payload.warnings))preview.warnings.push(...payload.warnings.filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,2000)));
+      preview.name='烟台大学教务系统';preview.format='官网登录读取（测试）';
+      showPreview();
+    }catch(error){preview=null;toast(error.message||'教务课表读取失败，原课表未修改');}
+  };
   async function receiveBytes(name,bytes) {
     if(bytes.length>MAX_BYTES){toast('文件不能超过 12 MB');return;}
     toast('正在本机解析课表…');

@@ -27,13 +27,15 @@ import java.util.concurrent.Executors;
 
 /** Offline UI. Only packaged assets are allowed to run beside the private storage bridge. */
 public final class MainActivity extends Activity {
-    private static final int PICK_FILE = 100, SAVE_BACKUP = 101;
+    private static final int PICK_FILE = 100, SAVE_BACKUP = 101, IMPORT_PORTAL = 102;
     private static final int MAX_IMPORT_BYTES = 12 * 1024 * 1024;
     private static final int MAX_STATE_BYTES = 4 * 1024 * 1024;
     private WebView web;
     private AtomicFile stateFile;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private String pendingBackup;
+    private JSONObject pendingPortalImport;
+    private boolean localUiReady;
 
     @SuppressLint("SetJavaScriptEnabled") // Packaged local UI requires JS; network/navigation blocked, imports rendered as text.
     @Override public void onCreate(Bundle bundle) {
@@ -54,6 +56,13 @@ public final class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setTextZoom(100);
         web.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                localUiReady = "file:///android_asset/index.html".equals(url);
+                if (localUiReady && pendingPortalImport != null) {
+                    event("receivePortalImport",pendingPortalImport);
+                    pendingPortalImport = null;
+                }
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return true; }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String uri = request.getUrl().toString();
@@ -96,6 +105,9 @@ public final class MainActivity extends Activity {
     }
 
     public final class LocalBridge {
+        @JavascriptInterface public void importPortal() {
+            runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, PortalImportActivity.class), IMPORT_PORTAL));
+        }
         @JavascriptInterface public String readState() {
             synchronized (stateFile) {
                 try (InputStream input = stateFile.openRead()) { return new String(readBounded(input, MAX_STATE_BYTES), StandardCharsets.UTF_8); }
@@ -149,6 +161,16 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == IMPORT_PORTAL) {
+            if (result != RESULT_OK || data == null) return;
+            try {
+                String text = data.getStringExtra("portalTimetable");
+                if (text == null || text.getBytes(StandardCharsets.UTF_8).length > PortalImportActivity.MAX_RESULT_BYTES) throw new IOException();
+                JSONObject payload = new JSONObject(text);
+                if (localUiReady) event("receivePortalImport",payload); else pendingPortalImport = payload;
+            } catch (Exception failed) { error("教务课表读取失败，原课表未修改。"); }
+            return;
+        }
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         if (request == PICK_FILE) worker.execute(() -> {
