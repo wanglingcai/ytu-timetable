@@ -31,7 +31,7 @@ public final class SmokeInstrumentation extends Instrumentation {
             await("document.readyState==='complete' && !!window.receiveImport");
             if(verifyExisting) {
                 check("JSON.parse(AndroidLocal.readState()).courses.length>0 && document.querySelector('#emptyState').hidden", "覆盖安装保留并加载原有课表");
-                check("document.querySelectorAll('.course-card').length===JSON.parse(AndroidLocal.readState()).courses.length", "覆盖安装后显示全部课程安排");
+                check("document.querySelectorAll('.course-card').length===Timetable.coursesForWeekView(JSON.parse(AndroidLocal.readState()).courses,Number(document.querySelector('#weekSelect').value)).length", "覆盖安装后显示所选周课程与安排");
                 check("document.querySelectorAll('.course-card.inactive').length>0", "覆盖安装后非本周课程显示为灰色");
                 js("document.querySelector('.course-card.inactive').click();true");
                 check("document.querySelector('#courseDetail').textContent.includes('不上课（非本周）')", "覆盖安装后灰色课程可查看实际周次");
@@ -115,6 +115,13 @@ public final class SmokeInstrumentation extends Instrumentation {
             await("document.querySelector('#importDialog').open");
             check("document.querySelectorAll('#previewList .list-card').length===3 && document.querySelector('#previewList').textContent.includes('教师甲 教师乙') && document.querySelector('#previewList').textContent.includes('10-11 周')", "官网结构化响应进入同一导入预览，保留教师和实际周次");
             js("document.querySelector('#cancelImport').click();true");
+            js("document.querySelector('.empty-slot[data-day=\"7\"][data-section=\"5\"]').click();true");
+            check("document.querySelector('#editDialog').open && document.querySelector('#courseDay').value==='7' && document.querySelector('#courseSections').value==='5' && document.querySelector('#courseWeeks').value==='3'", "空白格打开个人安排并预填星期、节次和所选周");
+            js("document.querySelector('#courseName').value='模拟自习';document.querySelector('#entryNotes').value='复习数学\\n整理错题';document.querySelector('#saveCourse').click();true");
+            runOnMainSync(() -> activity.finish());
+            waitForIdleSync();launch();await("document.readyState==='complete' && !!window.receiveImport");
+            js("document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
+            check("JSON.parse(AndroidLocal.readState()).courses.length===4 && JSON.parse(AndroidLocal.readState()).courses.filter(c=>c.kind==='personal')[0].notes==='复习数学\\n整理错题' && document.querySelectorAll('.personal-entry').length===1", "个人安排与多行备注写入私有存储，重建后恢复并保留学校课程");
             result.putString("stream", "\nPASS: " + checks + " Android checks\n" + report);
             finish(Activity.RESULT_OK, result);
         } catch (Throwable error) {

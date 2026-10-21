@@ -76,8 +76,16 @@
     if (!Number.isInteger(day) || day < 1 || day > 7) throw new Error('缺少有效星期');
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end > MAX_SECTIONS || end < start) throw new Error('缺少有效节次（1–16 节）');
     if (!Array.isArray(weeks) || !weeks.length || weeks.some(w => !Number.isInteger(w) || w < 1 || w > MAX_WEEKS)) throw new Error('缺少有效周次');
-    return { id: text(raw.id).slice(0,100) || uid(), name, teacher, room, day, start, end,
+    const course={ id: text(raw.id).slice(0,100) || uid(), name, teacher, room, day, start, end,
       weeks: Array.from(new Set(weeks)).sort((a,b)=>a-b), color: Number.isInteger(raw.color) ? ((raw.color % 8)+8)%8 : index%8 };
+    if(raw.kind!==undefined && !['course','personal'].includes(raw.kind))throw new Error('安排类型无效');
+    if(raw.kind==='personal') {
+      if(raw.notes!==undefined && typeof raw.notes!=='string')throw new Error('备注应为文字');
+      const notes=text(raw.notes);
+      if(notes.length>2000)throw new Error('备注不能超过 2000 字');
+      course.kind='personal';course.notes=notes;
+    }
+    return course;
   }
 
   function parseCell(value, day, fallbackSections, source, warnings) {
@@ -324,7 +332,7 @@
   }
   function coursesInWeek(courses,week) {return courses.filter(c=>c.weeks.includes(week)).sort((a,b)=>a.day-b.day||a.start-b.start||a.name.localeCompare(b.name,'zh'));}
   function coursesForWeekView(courses,week) {
-    return courses.map(c=>({...c,isActive:c.weeks.includes(week)}))
+    return courses.filter(c=>c.kind!=='personal'||c.weeks.includes(week)).map(c=>({...c,isActive:c.weeks.includes(week)}))
       .sort((a,b)=>a.day-b.day||a.start-b.start||Number(b.isActive)-Number(a.isActive)||a.name.localeCompare(b.name,'zh'));
   }
   function layoutCourses(courses) {

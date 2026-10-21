@@ -105,6 +105,22 @@ test('备份往返保留周次、作息及学期设置，拒绝错误/超界数�
   assert.throws(()=>T.validateState({...original,times:[['08:45','08:00']]}));
   assert.throws(()=>T.validateState({...original,times:[['08:00','08:45'],['08:30','09:00']]}));
 });
+
+test('个人安排备注随备份往返，旧课程结构保持兼容并拒绝过长备注',()=>{
+  const school=makeCourse(),personal=T.validateCourse({...school,id:'plan',kind:'personal',name:'模拟自习',notes:'复习第三章\n完成习题',weeks:[8]});
+  const state={...T.defaultState(),courses:[school,personal]};
+  const restored=T.validateState(JSON.parse(JSON.stringify(state)));
+  assert.deepEqual(restored.courses[0],school);assert.equal(restored.courses[1].notes,'复习第三章\n完成习题');assert.equal(restored.courses[1].kind,'personal');
+  assert.throws(()=>T.validateCourse({...personal,notes:'a'.repeat(2001)}));
+  assert.throws(()=>T.validateCourse({...personal,kind:'unknown'}));
+});
+
+test('个人安排仅在对应周显示，非本周学校课程仍保留为灰色参考',()=>{
+  const school=makeCourse({weeks:[1]}),personal=makeCourse({kind:'personal',notes:'模拟备注',weeks:[8]});
+  assert.equal(T.coursesForWeekView([school,personal],9).length,1);
+  const view=T.coursesForWeekView([school,personal],8);
+  assert.equal(view.length,2);assert.equal(view.find(c=>c.kind==='personal').isActive,true);assert.equal(view.find(c=>!c.kind).isActive,false);
+});
 test('相邻冲突链课程不会互相遮住，三门连续交叠使用稳定的两列',()=>{
   const a=makeCourse({start:1,end:2}),b=makeCourse({start:2,end:3}),c=makeCourse({start:3,end:4}),d=makeCourse({start:5,end:6});
   const positions=T.layoutCourses([a,b,c,d]);
