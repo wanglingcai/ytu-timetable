@@ -74,9 +74,9 @@ test('暗色、纯白与高对比壁纸下的文字衬底和玻璃界面',async(
     await page.locator('#backgroundMask').fill('0');await page.locator('#backgroundMask').dispatchEvent('change');
     await page.locator('#backgroundBlur').fill('0');await page.locator('#backgroundBlur').dispatchEvent('change');
     await page.locator('#settingsDialog .close-dialog').click();
-    expect(await page.locator('.schedule-wrap').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(255, 255, 255, 0.55)');
-    expect(await page.locator('.course-card:not(.inactive)').first().evaluate(n=>getComputedStyle(n).backgroundColor.startsWith('rgb('))).toBe(true);
-    expect(await page.locator('.course-card.inactive').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.9)');
+    expect(await page.locator('.schedule-wrap').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(255, 255, 255, 0.65)');
+    expect(await page.locator('.course-card:not(.inactive)').first().evaluate(n=>getComputedStyle(n).backgroundColor)).toMatch(/, 0\.9\)$/);
+    expect(await page.locator('.course-card.inactive').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.55)');
     await page.screenshot({path:`test-results/wallpaper-${kind}-phone.png`,fullPage:true});
   }
 });
@@ -89,7 +89,11 @@ test('八组课程配色与深色壁纸上的关键小字满足可读对比度',
   const rgb=value=>value.match(/[\d.]+/g).map(Number);
   const luminance=color=>rgb(color).slice(0,3).map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
   const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-  for(const [fg,bg] of colors)expect(contrast(fg,bg)).toBeGreaterThanOrEqual(4.5);
+  for(const [fg,bg] of colors){
+    // Translucent course fills over the 65% glass surface and a black wallpaper.
+    const c=rgb(bg),composite='rgb('+c.slice(0,3).map(n=>n*c[3]+255*.65*(1-c[3])).join(',')+')';
+    expect(contrast(fg,composite),fg+' on '+composite).toBeGreaterThanOrEqual(4.5);
+  }
   await page.locator('#settingsButton').click();await choose(page,'dark');await page.locator('#backgroundMask').fill('0');await page.locator('#backgroundMask').dispatchEvent('change');await page.locator('#settingsDialog .close-dialog').click();
   const pairs=await page.evaluate(()=>['.day-head.today .date','.day-head:not(.today) .date','.time-label span','.masthead h1','.semester-name','.week-card .small','.schedule-hint','.quick-action'].map(selector=>{
     const node=document.querySelector(selector);let background=[0,0,0];const ancestors=[];
@@ -99,4 +103,39 @@ test('八组课程配色与深色壁纸上的关键小字满足可读对比度',
     return [getComputedStyle(node).color,'rgb('+background.join(',')+')'];
   }));
   for(const [fg,bg] of pairs)expect(contrast(fg,bg),fg+' on '+bg).toBeGreaterThanOrEqual(4.5);
+});
+test('等宽数字与倒计时定宽，嵌套圆角匹配内距，课程与容器使用柔和阴影',async({page})=>{
+  await fixture(page);
+  const values=await page.evaluate(()=>{
+    const css=selector=>getComputedStyle(document.querySelector(selector)),radius=selector=>parseFloat(css(selector).borderTopLeftRadius);
+    return {
+      numeric:['#nextCountdown','#weekSelect','.day-head .date','.time-label span'].map(s=>css(s).fontVariantNumeric),
+      radii:[['.quickbar','.add-button'],['.next-card','.countdown'],['.week-card','#todayButton'],['.grid-slot','.course-card']].map(([outer,inner])=>[radius(outer),radius(inner),parseFloat(css(outer).paddingTop)]),
+      borders:['.next-card','.week-card','.quickbar','.schedule-wrap','.course-card:not(.inactive)'].map(s=>css(s).borderTopWidth),
+      shadows:['.next-card','.week-card','.quickbar','.schedule-wrap','.course-card:not(.inactive)'].map(s=>css(s).boxShadow),
+      balance:['.course-card strong','#nextName'].map(s=>css(s).textWrap),
+    };
+  });
+  values.numeric.forEach(n=>expect(n).toContain('tabular-nums'));
+  values.radii.forEach(([outer,inner,inset])=>expect(outer).toBe(inner+inset));
+  values.borders.forEach(border=>expect(border).toBe('0px'));values.shadows.forEach(shadow=>expect(shadow).toContain('inset'));
+  values.balance.forEach(wrap=>expect(wrap).toContain('balance'));
+  const box=await page.locator('#nextCountdown').boundingBox();
+  for(const text of ['还有 11 小时 32 分','还有 1 分钟','还有 8 小时 08 分']){
+    await page.locator('#nextCountdown').evaluate((n,text)=>n.textContent=text,text);
+    const next=await page.locator('#nextCountdown').boundingBox();expect(next.x).toBe(box.x);expect(next.width).toBe(box.width);
+  }
+});
+test('首次加载和快速切周按日期错峰入场，减少动态效果时取消，课表数据保持不变',async({page})=>{
+  await fixture(page);const before=await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'));
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.reload();
+  const timing=()=>page.evaluate(()=>Array.from(document.querySelectorAll('#nextCard,.week-card,#gridView,.course-card')).flatMap(node=>node.getAnimations().map(animation=>({id:node.id,day:Number(node.dataset.day)||0,...animation.effect.getTiming()}))));
+  const initial=await timing();expect(initial.some(a=>a.id==='nextCard')).toBe(true);
+  await page.locator('#prevWeek').click();await page.locator('#prevWeek').click();
+  const animations=await timing();expect(animations.length).toBe(9);
+  animations.forEach(a=>{expect(a.duration).toBe(250);expect(a.easing).toBe('cubic-bezier(0.22, 1, 0.36, 1)');});
+  const cards=animations.filter(a=>a.day);expect(cards.find(a=>a.day===7).delay-cards.find(a=>a.day===2).delay).toBe(150);
+  await page.emulateMedia({reducedMotion:'reduce'});await expect.poll(timing).toEqual([]);
+  await page.locator('#nextWeek').click();expect(await timing()).toEqual([]);
+  expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(before);
 });

@@ -70,7 +70,7 @@ test('非本周灰色显示，单双周同位置都可点击，无课周保留�
   await expect(page.locator('#scheduleHeading')).toHaveText('本周安排 · 1 项');await expect(page.locator('#conflictNotice')).not.toBeVisible();
   const active=page.locator('.course-card:not(.inactive)'),odd=page.locator('.course-card.inactive').filter({hasText:'单周参考课'});
   const activeBounds=await active.boundingBox(),oddBounds=await odd.boundingBox();expect(activeBounds.y+activeBounds.height).toBeLessThanOrEqual(oddBounds.y+1);expect(activeBounds.width).toBeGreaterThan(35);expect(activeBounds.height).toBeGreaterThan(oddBounds.height);
-  expect(await odd.evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.65)');
+  expect(await odd.evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.55)');
   await odd.click();await expect(page.locator('#courseDetail')).toContainText('第 8 周不上课（非本周）');await expect(page.locator('#courseDetail')).toContainText('B202');
   await page.locator('#courseDialog .close-dialog').click();await page.locator('#toast').evaluate(n=>n.hidden=true);
   await page.screenshot({path:'test-results/inactive-courses-phone.png',fullPage:true});

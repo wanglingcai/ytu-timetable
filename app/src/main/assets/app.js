@@ -6,6 +6,23 @@
   let state=T.defaultState(), week=1, listMode=false, preview=null, editId=null, editKind='course', repeatMode='single', toastTimer, toastTask, storageProblem=false, dialogStack=[], renderedDate='';
   const el=(tag,className,value)=> {const n=document.createElement(tag);if(className)n.className=className;if(value!==undefined)n.textContent=value;return n;};
   const append=(parent,...children)=>{children.forEach(c=>parent.append(c));return parent;};
+  const courseTitle=course=>course.kind==='personal'?course.name:(course.name.replace(/_\d+$/,'')||course.name);
+  const motionPreference=window.matchMedia('(prefers-reduced-motion: reduce)');
+  let entranceAnimations=[];
+  function animateEntrance() {
+    entranceAnimations.forEach(animation=>animation.cancel());entranceAnimations=[];
+    if(motionPreference.matches)return;
+    const enter=(node,delay)=>{
+      if(!node||node.hidden||!node.animate||!node.getClientRects().length)return;
+      entranceAnimations.push(node.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'translateY(0)'}],
+        {duration:250,delay,easing:'cubic-bezier(0.22, 1, 0.36, 1)',fill:'backwards'}));
+    };
+    enter($('nextCard'),0);enter(document.querySelector('.week-card'),30);
+    const view=listMode?$('listView'):$('gridView');enter(view,60);
+    view.querySelectorAll(listMode?'.list-card':'.course-card').forEach(card=>enter(card,90+(Number(card.dataset.day)-1)*30));
+  }
+  const stopMotion=()=>{if(motionPreference.matches){entranceAnimations.forEach(animation=>animation.cancel());entranceAnimations=[];}};
+  if(motionPreference.addEventListener)motionPreference.addEventListener('change',stopMotion);else motionPreference.addListener(stopMotion);
   function toast(message) {
     const t=$('toast');t.textContent=message;clearTimeout(toastTask);clearTimeout(toastTimer);
     toastTask=setTimeout(()=>{const open=dialogStack.filter(d=>d.open),host=open[open.length-1];t.classList.toggle('in-dialog',!!host);if(host)host.querySelector('.dialog-head').after(t);else document.body.append(t);t.hidden=false;toastTimer=setTimeout(()=>t.hidden=true,3500);},0);
@@ -62,7 +79,7 @@
     const now=new Date(),next=T.nextOccurrence(state,now),card=$('nextCard');
     card.hidden=!state.courses.length;card.disabled=!next;card.onclick=null;
     $('nextLabel').textContent=next&&next.ongoing?'此刻':'接下来';
-    $('nextName').textContent=next?next.course.name:'暂时没有新安排';
+    $('nextName').textContent=next?courseTitle(next.course):'暂时没有新安排';
     $('nextMeta').textContent='点课表空白格，留一点时间给自己';$('nextCountdown').textContent='';
     if(next) {
       const today=T.dateString(now),tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
@@ -105,13 +122,14 @@
       const card=el('button','course-card palette-'+T.coursePalette(c)+(inactive?' inactive':'')+(conflicts.some(x=>x.a===c.id||x.b===c.id)?' conflict':''));
       if(c.start===c.end)card.classList.add('single-section');
       card.type='button';card.setAttribute('aria-label',(inactive?'非本周，':'本周上课，')+c.name+'，'+DAY[c.day]+'第'+c.start+'-'+c.end+'节，'+c.room);
+      card.dataset.day=c.day;
       card.title=c.name+' · '+(c.room||'地点待定');
       if(c.kind==='personal'){card.classList.add('personal-entry');card.setAttribute('aria-label','个人安排，'+c.name+'，'+DAY[c.day]+'第'+c.start+'-'+c.end+'节');}
       card.style.gridColumn=c.day+1;card.style.gridRow=(c.start+1)+' / '+(c.end+2);
       if(count>1){card.style.width='calc('+(100/count)+'% - 2px)';card.style.marginLeft='calc('+(100*index/count)+'% + 1px)';}
       if(inactive)card.append(el('span','course-status','非本周'));
       else if(c.kind==='personal')card.append(el('span','course-status','个人'));
-      append(card,el('strong','',c.kind==='personal'?c.name:(c.name.replace(/_\d+$/,'')||c.name)),el('small','',c.room||'地点待定'));
+      append(card,el('strong','',courseTitle(c)),el('small','',c.room||'地点待定'));
       card.addEventListener('click',()=>detail(c.id));
       if(position.stackKey) {
         let host=stacks.get(position.stackKey);
@@ -138,6 +156,7 @@
   function courseRow(c,withWeeks=false) {
     const inactive=!c.weeks.includes(week);
     const button=el('button','list-card'+(inactive?' inactive':''));button.type='button';
+    button.dataset.day=c.day;
     const chip=el('span','time-chip palette-'+T.coursePalette(c)+(inactive?' inactive':''),c.start+'–'+c.end+' 节');
     const info=el('span','course-info');append(info,el('strong','',c.name),el('p','',[DAY[c.day],c.room||'地点待定',c.teacher].filter(Boolean).join(' · ')));
     if(c.kind==='personal')info.append(el('p','course-status','个人安排 · '+T.formatWeeks(c.weeks)+' 周'));
@@ -307,7 +326,7 @@
   $('reminderSettingsButton').onclick=openSettings;
   $('notificationPermission').onclick=()=>AndroidLocal.reminderPermission('notifications');
   $('exactReminderPermission').onclick=()=>AndroidLocal.reminderPermission('exact');
-  function goWeek(value){week=Math.max(1,Math.min(state.totalWeeks,value));render();if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){const view=listMode?$('listView'):$('gridView');if(view.animate)view.animate([{opacity:.55,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],{duration:160,easing:'ease-out'});}}
+  function goWeek(value){week=Math.max(1,Math.min(state.totalWeeks,value));render();animateEntrance();}
   $('prevWeek').onclick=()=>{if(week>1)goWeek(week-1);};$('nextWeek').onclick=()=>{if(week<state.totalWeeks)goWeek(week+1);};
   $('weekSelect').onchange=event=>goWeek(Number(event.target.value));
   $('todayButton').onclick=()=>goWeek(T.currentWeek(state.startDate));
@@ -329,6 +348,6 @@
   function sizeViewport(){document.documentElement.style.setProperty('--visual-height',Math.floor(window.visualViewport?window.visualViewport.height:window.innerHeight)+'px');}
   window.addEventListener('resize',sizeViewport);if(window.visualViewport)window.visualViewport.addEventListener('resize',sizeViewport);sizeViewport();
   if(window.ResizeObserver)new ResizeObserver(fitCourseCards).observe($('scheduleGrid'));else window.addEventListener('resize',fitCourseCards);
-  load();render();refreshReminderStatus();
+  load();render();animateEntrance();refreshReminderStatus();
   setInterval(()=>{if(!document.hidden){if(renderedDate!==T.dateString(new Date()))render();else updateTimeCues();}},30000);
 })();
