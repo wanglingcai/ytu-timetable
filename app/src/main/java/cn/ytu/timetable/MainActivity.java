@@ -36,6 +36,7 @@ public final class MainActivity extends Activity {
     private String pendingBackup;
     private JSONObject pendingPortalImport;
     private boolean localUiReady;
+    private JSONObject pendingReminder;
 
     @SuppressLint("SetJavaScriptEnabled") // Packaged local UI requires JS; network/navigation blocked, imports rendered as text.
     @Override public void onCreate(Bundle bundle) {
@@ -44,6 +45,7 @@ public final class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.rgb(247, 247, 241));
         getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         stateFile = new AtomicFile(new File(getFilesDir(), "timetable.json"));
+        captureReminder(getIntent());
         web = new WebView(this);
         web.setBackgroundColor(Color.rgb(247, 247, 241));
         WebSettings settings = web.getSettings();
@@ -62,6 +64,7 @@ public final class MainActivity extends Activity {
                     event("receivePortalImport",pendingPortalImport);
                     pendingPortalImport = null;
                 }
+                deliverReminder();
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return true; }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -95,7 +98,7 @@ public final class MainActivity extends Activity {
     }
 
     private void event(String name, JSONObject payload) {
-        runOnUiThread(() -> { if (!isDestroyed()) web.evaluateJavascript("window." + name + "(" + payload.toString() + ")", null); });
+        runOnUiThread(() -> { if (!isDestroyed()) web.evaluateJavascript("if(typeof window."+name+"==='function')window." + name + "(" + payload.toString() + ")", null); });
     }
 
     private void error(String message) {
@@ -104,12 +107,52 @@ public final class MainActivity extends Activity {
         event("receiveNativeError", data);
     }
 
+    private void captureReminder(Intent intent) {
+        if(intent==null||!"cn.ytu.timetable.OPEN_REMINDER".equals(intent.getAction()))return;
+        try {
+            String id=intent.getStringExtra("courseId"),date=intent.getStringExtra("occurrenceDate");
+            if(id==null||id.length()>100||date==null||!date.matches("\\d{4}-\\d{2}-\\d{2}"))return;
+            pendingReminder=new JSONObject().put("id",id).put("date",date);
+        }catch(Exception ignored){}
+    }
+    private void deliverReminder() {
+        if(localUiReady&&pendingReminder!=null){event("openReminder",pendingReminder);pendingReminder=null;}
+    }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);setIntent(intent);captureReminder(intent);deliverReminder();
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        worker.execute(()->{ReminderScheduler.refresh(getApplicationContext(),false);event("refreshReminderStatus",new JSONObject());});
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results) {
+        super.onRequestPermissionsResult(request,permissions,results);
+        if(request==103)worker.execute(()->{ReminderScheduler.refresh(getApplicationContext(),false);event("refreshReminderStatus",new JSONObject());});
+    }
+
     public final class LocalBridge {
+        @JavascriptInterface public String reminderStatus() {return ReminderScheduler.status(MainActivity.this);}
+        @JavascriptInterface public void reminderPermission(String kind) {
+            runOnUiThread(()->{
+                try {
+                    if("exact".equals(kind)) {
+                        if(android.os.Build.VERSION.SDK_INT>=31)startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+getPackageName())));
+                    } else if(android.os.Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED
+                        &&!getPreferences(MODE_PRIVATE).getBoolean("notificationAsked",false)) {
+                        getPreferences(MODE_PRIVATE).edit().putBoolean("notificationAsked",true).apply();
+                        requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},103);
+                    } else {
+                        startActivity(new Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,getPackageName()).putExtra(android.provider.Settings.EXTRA_CHANNEL_ID,ReminderScheduler.CHANNEL));
+                    }
+                }catch(Exception unavailable){error("无法打开提醒权限设置，请在系统设置中找到本应用并检查通知权限。");}
+            });
+        }
         @JavascriptInterface public void importPortal() {
             runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, PortalImportActivity.class), IMPORT_PORTAL));
         }
         @JavascriptInterface public String readState() {
-            synchronized (stateFile) {
+            synchronized (ReminderScheduler.LOCK) {
                 try (InputStream input = stateFile.openRead()) { return new String(readBounded(input, MAX_STATE_BYTES), StandardCharsets.UTF_8); }
                 catch (FileNotFoundException missing) { return ""; }
                 catch (Exception failed) { return "{\"storageError\":true}"; }
@@ -121,10 +164,12 @@ public final class MainActivity extends Activity {
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
             if (bytes.length > MAX_STATE_BYTES) return false;
             try { new JSONObject(json); } catch (Exception invalid) { return false; }
-            synchronized (stateFile) {
+            synchronized (ReminderScheduler.LOCK) {
                 FileOutputStream output = null;
-                try { output = stateFile.startWrite(); output.write(bytes); stateFile.finishWrite(output); return true; }
+                try { output = stateFile.startWrite(); output.write(bytes); stateFile.finishWrite(output); }
                 catch (Exception failed) { if (output != null) stateFile.failWrite(output); return false; }
+                ReminderScheduler.refresh(MainActivity.this,true);
+                return true;
             }
         }
 

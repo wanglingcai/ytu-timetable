@@ -22,9 +22,11 @@ public final class SmokeInstrumentation extends Instrumentation {
     private Activity activity;
     private int checks;
     private boolean verifyExisting;
+    private String reminderMode;
     private final StringBuilder report = new StringBuilder();
-    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); start(); }
+    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); start(); }
     @Override public void onStart() {
+        if(reminderMode!=null){new ReminderChecks(this).run(reminderMode);return;}
         Bundle result = new Bundle();
         try {
             launch();

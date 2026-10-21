@@ -25,7 +25,7 @@
       const json=JSON.stringify(next);
       if(window.AndroidLocal) {if(!AndroidLocal.saveState(json))throw new Error('手机存储写入失败，请先导出备份并检查剩余空间');}
       else {localStorage.setItem(KEY,json);if(localStorage.getItem(KEY)!==json)throw new Error('浏览器无法保存数据');}
-      state=next;storageProblem=false;week=Math.min(week,state.totalWeeks);render();if(message)toast(message);return true;
+      state=next;storageProblem=false;week=Math.min(week,state.totalWeeks);render();refreshReminderStatus();if(message)toast(message);return true;
     } catch(error) {toast(error.message||'保存失败');return false;}
   }
   function activeCourses(){return T.coursesInWeek(state.courses,week);}
@@ -107,6 +107,7 @@
     const host=$('courseDetail');host.replaceChildren();host.append(el('h3','detail-name',c.name));
     const rows=[['所选周','第 '+week+' 周'+(c.weeks.includes(week)?'上课':'不上课（非本周）')],['星期',DAY[c.day]],['节次','第 '+c.start+'–'+c.end+' 节'],['时间',state.times[c.start-1][0]+'–'+state.times[c.end-1][1]],['周次',T.formatWeeks(c.weeks)+' 周'],['地点',c.room||'尚未填写'],['教师',c.teacher||'尚未填写']];
     if(personal){rows[0]=['所选周','第 '+week+' 周'+(c.weeks.includes(week)?'有安排':'无安排')];rows.pop();if(c.weeks.length===1)rows.unshift(['日期',T.weekDates(state.startDate,c.weeks[0])[c.day-1]]);rows.push(['备注',c.notes||'尚未填写']);}
+    rows.push(['提醒',reminderLabel(personal?(c.reminderMinutes===undefined?-1:c.reminderMinutes):state.reminders.courseMinutes)]);
     for(const [key,value] of rows)host.append(append(el('div','detail-row'),el('span','',key),el('span','',value)));
     const actions=el('div','detail-actions'), edit=el('button','button primary',personal?'修改安排':'修改课程'), del=el('button','button danger',personal?'删除安排':'删除课程');
     edit.onclick=()=>{closeDialog('courseDialog');openEdit(c);};
@@ -119,6 +120,7 @@
     $('editTitle').textContent=personal?(c?'修改安排':'添加个人安排'):(c?'修改课程':'添加课程');
     $('entryNameLabel').textContent=personal?'安排名称':'课程名称';$('entryRoomLabel').textContent=personal?'地点':'教室';
     $('courseTeacherField').hidden=personal;$('notesField').hidden=!personal;
+    $('personalReminderField').hidden=!personal;$('personalReminder').value=c&&c.reminderMinutes!==undefined?String(c.reminderMinutes):'-1';
     $('entryWeeksLabel').textContent=personal?'安排周次':'上课周次';$('saveCourse').textContent=personal?'保存安排':'保存课程';
     $('editHint').textContent=personal?'默认只安排在所选的第 '+week+' 周。可以修改节次，或填写连续周、单双周，让安排重复出现。':'支持连续周、单双周和离散周次。超出学期或节次设置时会提示。';
     $('courseName').value=c?c.name:'';$('courseTeacher').value=c?c.teacher:'';$('courseRoom').value=c?c.room:'';
@@ -129,8 +131,39 @@
   function renderAll() {const host=$('allList');host.replaceChildren();[...state.courses].sort((a,b)=>a.day-b.day||a.start-b.start).forEach(c=>host.append(courseRow(c,true)));if(!state.courses.length)host.append(el('p','small','还没有课程。'));}
   function openAll(){renderAll();showDialog('allDialog');}
   function openSettings() {
-    $('semesterInput').value=state.semester;$('startInput').value=state.startDate;$('weeksInput').value=state.totalWeeks;renderTimes(state.times);showDialog('settingsDialog');
+    $('semesterInput').value=state.semester;$('startInput').value=state.startDate;$('weeksInput').value=state.totalWeeks;$('courseReminder').value=String(state.reminders.courseMinutes);refreshReminderStatus();renderTimes(state.times);showDialog('settingsDialog');
   }
+  function reminderLabel(minutes){return minutes<0?'关闭':minutes===0?'准点提醒':'提前 '+minutes+' 分钟';}
+  function refreshReminderStatus() {
+    let message='提醒在安卓应用中生效；浏览器仅保存设置。',needsPermission=false;
+    const native=window.AndroidLocal&&typeof AndroidLocal.reminderStatus==='function';
+    if(native) {
+      try {
+        const status=JSON.parse(AndroidLocal.reminderStatus());
+        needsPermission=!status.notifications||!status.exact;
+        message=!status.notifications?'通知未开启，当前无法发送提醒。':!status.exact?'通知已开启；准时提醒权限未开启，系统可能延迟发送。':'通知和准时提醒权限已开启。';
+        if(status.nextAt)message+=' 下一次提醒：'+new Date(status.nextAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})+'。';
+        else if(status.notifications)message+=' 暂无未来提醒；已过提醒时间的安排不补发。';
+        if(status.problem)message+=' '+status.problem;
+        $('exactReminderPermission').hidden=status.exact;
+        $('notificationPermission').textContent=status.notifications?'通知声音与振动设置':'开启通知';
+      }catch(error){message='无法读取提醒状态，请重新打开应用检查。';needsPermission=true;}
+    }
+    $('reminderStatus').textContent=message;$('notificationPermission').hidden=!native;
+    if(!native)$('exactReminderPermission').hidden=true;
+    $('reminderPermissionHint').hidden=!(needsPermission&&state.courses.some(c=>c.kind==='personal'?(c.reminderMinutes!==undefined&&c.reminderMinutes>=0):state.reminders.courseMinutes>=0));
+  }
+  window.refreshReminderStatus=refreshReminderStatus;
+  window.openReminder=payload=>{
+    const c=state.courses.find(c=>c.id===payload.id);
+    if(!c){toast('这条课程或安排已被删除或替换。');return;}
+    let occurrenceWeek;
+    try {
+      const date=T.parseDate(payload.date);occurrenceWeek=T.currentWeek(state.startDate,date);
+      if(!c.weeks.includes(occurrenceWeek)||T.weekDates(state.startDate,occurrenceWeek)[c.day-1]!==payload.date)throw new Error();
+    }catch(error){toast('这条安排的日期已改变，请查看最新课表。');return;}
+    closeAll();week=occurrenceWeek;render();detail(c.id);
+  };
   function renderTimes(times) {
     $('timeInputs').replaceChildren();
     times.forEach((pair,i)=>{const row=el('div','time-row');row.append(el('span','','第 '+(i+1)+' 节'));pair.forEach((time,j)=>{if(j)row.append(el('span','','—'));const input=el('input');input.type='time';input.required=true;input.value=time;input.setAttribute('aria-label','第'+(i+1)+'节'+(j?'结束':'开始')+'时间');row.append(input);});$('timeInputs').append(row);});
@@ -203,6 +236,9 @@
   $('fileInput').addEventListener('change',async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;if(file.size>MAX_BYTES){toast('文件不能超过 12 MB');return;}receiveBytes(file.name,new Uint8Array(await file.arrayBuffer()));});
   ['importButton','emptyImport'].forEach(id=>$(id).onclick=chooseFile);
   $('settingsButton').onclick=openSettings;$('sampleButton').onclick=sample;
+  $('reminderSettingsButton').onclick=openSettings;
+  $('notificationPermission').onclick=()=>AndroidLocal.reminderPermission('notifications');
+  $('exactReminderPermission').onclick=()=>AndroidLocal.reminderPermission('exact');
   $('prevWeek').onclick=()=>{if(week>1){week--;render();}};$('nextWeek').onclick=()=>{if(week<state.totalWeeks){week++;render();}};
   $('weekSelect').onchange=event=>{week=Number(event.target.value);render();};
   $('todayButton').onclick=()=>{week=Math.max(1,Math.min(state.totalWeeks,T.currentWeek(state.startDate)));render();};
@@ -211,12 +247,12 @@
   $('addPersonalButton').onclick=()=>openEdit(null,{day:1,start:1,end:1});
   document.querySelectorAll('.close-dialog').forEach(button=>button.onclick=()=>button.closest('dialog').close());
   $('cancelImport').onclick=()=>closeDialog('importDialog');$('cancelEdit').onclick=()=>closeDialog('editDialog');$('saveImport').onclick=importSave;
-  $('settingsForm').onsubmit=event=>{event.preventDefault();if(persist({...state,semester:$('semesterInput').value,startDate:$('startInput').value,totalWeeks:Number($('weeksInput').value),times:readTimes()},'设置已保存'))closeDialog('settingsDialog');};
+  $('settingsForm').onsubmit=event=>{event.preventDefault();if(persist({...state,semester:$('semesterInput').value,startDate:$('startInput').value,totalWeeks:Number($('weeksInput').value),times:readTimes(),reminders:{courseMinutes:Number($('courseReminder').value)}},'设置已保存'))closeDialog('settingsDialog');};
   $('addTimeButton').onclick=()=>{const times=readTimes();if(times.length>=16){toast('最多支持 16 节');return;}const last=times[times.length-1],start=(Number(last[1].slice(0,2))*60+Number(last[1].slice(3))+10),end=start+45;if(end>=1440){toast('末节时间已接近午夜，请先调整时间');return;}const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');renderTimes([...times,[hm(start),hm(end)]]);};
   $('removeTimeButton').onclick=()=>{const times=readTimes();if(times.length<=1){toast('至少保留一节');return;}if(state.courses.some(c=>c.end>=times.length)){toast('末节仍有课程，不能删除');return;}renderTimes(times.slice(0,-1));};
   $('clearButton').onclick=()=>{if(!confirm('确定清空本机课表？建议先取消并导出备份。此操作无法撤销。'))return;if(persist({...state,courses:[],sourceName:''},'课表已清空'))closeAll();};
-  $('courseForm').onsubmit=event=>{event.preventDefault();try{const sections=T.parseSections($('courseSections').value);if(!sections)throw new Error('节次格式应为 1-2 或 3');const previous=state.courses.find(c=>c.id===editId);const c=T.validateCourse({id:editId||T.uid(),name:$('courseName').value,teacher:$('courseTeacher').value,room:$('courseRoom').value,day:Number($('courseDay').value),...sections,weeks:T.parseWeeks($('courseWeeks').value),color:previous?previous.color:state.courses.length%8,...(editKind==='personal'?{kind:'personal',notes:$('entryNotes').value}:{})});const courses=editId?state.courses.map(x=>x.id===editId?c:x):[...state.courses,c];if(persist({...state,courses},editKind==='personal'?'个人安排已保存':'课程已保存')){closeDialog('editDialog');renderAll();}}catch(error){toast(error.message);}};
+  $('courseForm').onsubmit=event=>{event.preventDefault();try{const sections=T.parseSections($('courseSections').value);if(!sections)throw new Error('节次格式应为 1-2 或 3');const previous=state.courses.find(c=>c.id===editId);const c=T.validateCourse({id:editId||T.uid(),name:$('courseName').value,teacher:$('courseTeacher').value,room:$('courseRoom').value,day:Number($('courseDay').value),...sections,weeks:T.parseWeeks($('courseWeeks').value),color:previous?previous.color:state.courses.length%8,...(editKind==='personal'?{kind:'personal',notes:$('entryNotes').value,reminderMinutes:Number($('personalReminder').value)}:{})});const courses=editId?state.courses.map(x=>x.id===editId?c:x):[...state.courses,c];if(persist({...state,courses},editKind==='personal'?'个人安排已保存':'课程已保存')){closeDialog('editDialog');renderAll();}}catch(error){toast(error.message);}};
   // Keep date/week labels current when returning from background or crossing midnight.
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)render();});
-  load();render();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();refreshReminderStatus();}});
+  load();render();refreshReminderStatus();
 })();

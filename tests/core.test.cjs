@@ -121,6 +121,19 @@ test('个人安排仅在对应周显示，非本周学校课程仍保留为灰�
   const view=T.coursesForWeekView([school,personal],8);
   assert.equal(view.length,2);assert.equal(view.find(c=>c.kind==='personal').isActive,true);assert.equal(view.find(c=>!c.kind).isActive,false);
 });
+
+test('旧备份默认课程提前十分钟，提醒选项可备份且拒绝非法值',()=>{
+  const old={...T.defaultState(),courses:[makeCourse()]};delete old.reminders;
+  assert.deepEqual(T.validateState(old).reminders,{courseMinutes:10});
+  for(const minutes of [-1,0,5,10,15,30]) {
+    const plan=makeCourse({kind:'personal',reminderMinutes:minutes});
+    const state={...T.defaultState(),reminders:{courseMinutes:minutes},courses:[plan]};
+    const restored=T.validateState(JSON.parse(JSON.stringify(state)));
+    assert.equal(restored.reminders.courseMinutes,minutes);assert.equal(restored.courses[0].reminderMinutes,minutes);
+  }
+  for(const minutes of [null,'10',undefined,2,60])assert.throws(()=>T.validateState({...old,reminders:{courseMinutes:minutes}}));
+  for(const minutes of [null,'10',2,60])assert.throws(()=>makeCourse({kind:'personal',reminderMinutes:minutes}));
+});
 test('相邻冲突链课程不会互相遮住，三门连续交叠使用稳定的两列',()=>{
   const a=makeCourse({start:1,end:2}),b=makeCourse({start:2,end:3}),c=makeCourse({start:3,end:4}),d=makeCourse({start:5,end:6});
   const positions=T.layoutCourses([a,b,c,d]);

@@ -2,6 +2,17 @@
 
 更新日期：2026-10-21（Asia/Shanghai）。初版及 0.1.2 的检查于 2026-10-20 完成，0.2.0 检查跨至 2026-10-21。初版使用自造模拟课表；另在本机核对过一份图片型 PDF，经人工转换后验证了 CSV 导入。个人数据和专用核对记录不上传 GitHub。
 
+## 0.4.0 课程与个人安排提醒
+
+- 增加原生 `ReminderPlanner`、`ReminderScheduler`、`ReminderReceiver`：按实际学期日期/周次/星期/节次计算，在手机当地时区调度最近一批 `AlarmManager` 闹钟；同刻多项分别通知，触发后继续调度下一批。课程默认提前 10 分钟，可选关闭、准点、5/15/30 分钟；个人安排在编辑器中独立选择，默认关闭。
+- 保存修改、删除、清空、普通导入或备份恢复时统一撤销旧闹钟和已显示通知，重新读取持久化课表；使用代次标记拒绝旧广播。通知 PendingIntent 包含记录 ID 和发生日期，冷启动及已打开应用时均定位该日期的对应详情；过期或已删除通知不打开错误记录。
+- 浏览器仅保存设置；新增三个通用浏览器用例覆盖课程全部选项、个人提醒编辑与备份恢复、通知日期定位和无效通知、权限状态和入口。23 项核心测试、14 项仓库通用浏览器测试通过；另有 2 项本机私有样本测试通过，共 16 项浏览器测试。
+- Android 15 模拟器 20 项原有冒烟检查通过；36 项提醒检查通过，包含默认/各提前值、实际周次、跨年/时区/夏令时、同刻两条提醒、个人关闭、编辑/删除/重新导入同步、系统真实到点投递、关闭 Activity 后送达，以及实际通知 PendingIntent 的冷/热启动详情跳转。
+- 6 项权限检查通过：未获通知授权不安排闹钟；实际从应用按钮调出 Android 通知权限申请并点击系统允许；通知授权回调重新调度；精确闹钟权限关闭时可延迟调度且显示相应文案和入口。
+- 另将未来模拟提醒写入系统后结束测试进程并重启模拟器，未打开主界面；重启后在 `dumpsys alarm` 看到原定时间的 RTC_WAKEUP，实际到点后通过系统通知列表确认 `school:日期` 与 `personal:日期` 两条内容通知，私有调度时间已推进到下一项。Android 可能额外生成 `ranker_group` 汇总通知，不能把通知总数固定断言为 2。
+- 从 0.3.0 覆盖安装 0.4.0，私有课表文件 SHA-256 一致，4 项升级检查通过。构建、Lint 通过（仅保留原有 OldTargetApi 提醒）；设置页手机尺寸截图已查看。
+- 验证边界：通知验证使用专用模拟器和临近时间的模拟课程，不是用户实体手机；其他安卓版本、厂商省电策略、静音/勿扰下的声音及长期待机准时性仍需实机试用。系统“强行停止”后需要用户重新打开应用；未开精确闹钟时可能延迟或错过，不承诺绕过系统限制。
+
 ## 0.3.0 空白格个人安排
 
 - 新增点击空白格添加个人安排，预填星期、节次和当前所选周；支持名称、地点、多行备注及重复周次，卡片可查看、修改、删除。个人安排仅在其对应周显示，学校课程的非本周灰色显示保留。
@@ -62,11 +73,12 @@
 | 真实官网登录后导入 | 原生流程通过模拟页面测试，0.2.2 获用户手机读取成功反馈 | 用户反馈成功；开发侧无真实账号独立复现，拼图显示待确认 |
 | 空白格个人安排 | 浏览器验证添加/修改/删除、重复周次、备注、备份、同步保留；原生验证保存和重建 | 已验证浏览器与模拟器，实体手机待试用 |
 | 一份实际图片型 PDF 的转换文件 | 本机人工核对后转换 CSV，通过实际导入界面保存、周次筛选和刷新恢复测试；原文件与个人课表不随仓库分发 | **本次转换文件已验证；直接 PDF 导入未实现** |
-| 用户实体安卓手机 | 未直接连接设备；用户反馈 0.2.2 官网读取恢复正常 | 官网读取获反馈，0.3.0 个人安排待试用 |
+| 到点提醒 | 实际系统闹钟投递、关闭界面后接收、通知详情跳转、变更取消与权限流程 | 已验证 Android 15 模拟器，实体手机待试用 |
+| 用户实体安卓手机 | 未直接连接设备；用户反馈 0.2.2 官网读取恢复正常 | 官网读取获反馈，0.4.0 提醒待试用 |
 
 ## 自动测试
 
-### 解析、日期与数据校验：22 项通过
+### 解析、日期与数据校验：23 项通过
 
 ```powershell
 npm.cmd test
@@ -76,7 +88,7 @@ npm.cmd test
 
 0.1.1 新增非本周课程的视图标记、原数据不变、同一时段本周/非本周卡片上下排列与本周优先、单双周不误报冲突的校验。
 
-### 手机尺寸浏览器测试：仓库通用测试 11 项通过
+### 手机尺寸浏览器测试：仓库通用测试 14 项通过
 
 ```powershell
 npm.cmd run test:ui
@@ -108,6 +120,31 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 ```
 
 成功输出：`PASS: 20 Android checks`。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
+
+### 安卓提醒专项检查
+
+同样仅用于专用模拟器，会替换其中课表为模拟提醒数据。先安装主 APK 和测试 APK，再执行（完整提醒检查需要等待下一分钟附近的实际闹钟，通常约 30–90 秒）：
+
+```powershell
+$taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
+& $taskAdb -s emulator-5554 shell pm grant cn.ytu.timetable.personal android.permission.POST_NOTIFICATIONS
+& $taskAdb -s emulator-5554 shell appops set cn.ytu.timetable.personal SCHEDULE_EXACT_ALARM allow
+& $taskAdb -s emulator-5554 shell am instrument -w -e reminders all cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
+```
+
+成功输出 `PASS: 36 reminder checks`。仅在 Android 13 及以上使用上述通知运行时权限命令。检查包含真实系统通知，不使用测试专用发送路径；测试代码和模拟数据不进入主 APK。
+
+权限流程检查先撤销专用模拟器授权，然后使用 Android 系统权限对话框的允许按钮：
+
+```powershell
+& $taskAdb -s emulator-5554 shell pm revoke cn.ytu.timetable.personal android.permission.POST_NOTIFICATIONS
+& $taskAdb -s emulator-5554 shell appops set cn.ytu.timetable.personal SCHEDULE_EXACT_ALARM deny
+& $taskAdb -s emulator-5554 shell am instrument -w -e reminders permissions cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
+```
+
+成功输出 `PASS: 6 permission checks`。测试会允许通知，精确闹钟仍关闭；完整提醒检查前需恢复精确闹钟授权。
+
+重启恢复检查可先恢复精确闹钟授权，运行 `-e reminders seed`，输出未来约 90–150 秒的时间戳，再用 `adb -s emulator-5554 reboot` 重启。等待 `sys.boot_completed` 为 `1`，通过 `dumpsys alarm` 查本应用的闹钟；到点后通过 `adb -s emulator-5554 shell cmd notification list` 检查本应用 `school:日期` 和 `personal:日期` 的通知键。应在下一节模拟课程（原提醒后 1 分钟）前检查，忽略系统自动生成的汇总键；这一步无需打开课表 Activity，也无需重新运行 Instrumentation。
 
 ## 构建与交付检查
 

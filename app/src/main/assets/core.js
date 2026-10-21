@@ -84,6 +84,10 @@
       const notes=text(raw.notes);
       if(notes.length>2000)throw new Error('备注不能超过 2000 字');
       course.kind='personal';course.notes=notes;
+      if(raw.reminderMinutes!==undefined) {
+        if(![-1,0,5,10,15,30].includes(raw.reminderMinutes))throw new Error('提醒时间无效');
+        course.reminderMinutes=raw.reminderMinutes;
+      }
     }
     return course;
   }
@@ -297,7 +301,7 @@
     return Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return dateString(d);});
   }
   function defaultState(now=new Date()) {
-    return {schemaVersion:1,semester:'我的课表',startDate:dateString(mondayOf(now)),totalWeeks:20,times:DEFAULT_TIMES.map(x=>x.slice()),courses:[],sourceName:'',savedAt:''};
+    return {schemaVersion:1,semester:'我的课表',startDate:dateString(mondayOf(now)),totalWeeks:20,times:DEFAULT_TIMES.map(x=>x.slice()),courses:[],reminders:{courseMinutes:10},sourceName:'',savedAt:''};
   }
   function validateState(raw) {
     if (!raw || raw.schemaVersion!==1 || !Array.isArray(raw.courses)) throw new Error('不是有效的下节啥课备份（版本 1）');
@@ -317,7 +321,9 @@
     if (courses.some(c=>c.end>times.length)) throw new Error('有课程超过已配置的最大节次');
     if (courses.some(c=>c.weeks.some(w=>w>raw.totalWeeks))) throw new Error('有课程超过学期总周数');
     const ids=new Set();for(const c of courses){if(ids.has(c.id))c.id=uid();ids.add(c.id);}
-    return {schemaVersion:1,semester:text(raw.semester).slice(0,80)||'我的课表',startDate:raw.startDate,totalWeeks:raw.totalWeeks,times,courses,sourceName:text(raw.sourceName).slice(0,200),savedAt:text(raw.savedAt).slice(0,40)};
+    const reminders=raw.reminders===undefined?{courseMinutes:10}:raw.reminders;
+    if(!reminders||typeof reminders!=='object'||![-1,0,5,10,15,30].includes(reminders.courseMinutes))throw new Error('课程提醒设置无效');
+    return {schemaVersion:1,semester:text(raw.semester).slice(0,80)||'我的课表',startDate:raw.startDate,totalWeeks:raw.totalWeeks,times,courses,reminders:{courseMinutes:reminders.courseMinutes},sourceName:text(raw.sourceName).slice(0,200),savedAt:text(raw.savedAt).slice(0,40)};
   }
   function findConflicts(courses) {
     const results=[];
