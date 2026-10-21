@@ -96,7 +96,7 @@
       const after = s.slice(match.index + match[0].length, next ? next.index : s.length);
       // A course starts with a name and optional teacher before its week token.
       const lines = before.split(/\n+/).map(text).filter(Boolean);
-      let name = lines.length>1 ? lines.slice(0,-1).join(' ') : (lines[0] || ''), teacher = lines.length>1 ? lines.at(-1) : '';
+      let name = lines.length>1 ? lines.slice(0,-1).join(' ') : (lines[0] || ''), teacher = lines.length>1 ? lines[lines.length-1] : '';
       if (lines.length === 1) {
         const starred = name.match(/^(.+?)\s+([^\s]+\*)\s*$/);
         if (starred) { name=starred[1]; teacher=starred[2]; }
@@ -191,7 +191,7 @@
     let days={};
     for (let r=0;r<Math.min(rows.length,50);r++) {
       const candidate={};
-      (rows[r]||[]).forEach((v,c)=> {const day=parseDay(v);if(day && /星期|周|礼拜|mon|tue|wed|thu|fri|sat|sun/i.test(text(v))) candidate[c]=day;});
+      (rows[r]||[]).forEach((v,c)=> {const day=parseDay(v);if(day && /星期|周|礼拜|mon|tue|wed|thu|fri|sat|sun/i.test(text(v).replace(/\s/g,''))) candidate[c]=day;});
       if (Object.keys(candidate).length>=3) {header=r;days=candidate;break;}
     }
     if (header < 0) throw new Error('未找到课程清单表头或星期网格。请导入原始课表文件，或使用随附的 CSV 模板。');

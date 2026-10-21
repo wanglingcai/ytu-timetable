@@ -27,6 +27,19 @@ test('官网尚未加载或空课表时返回明确错误，桌面预览引导�
   const missing=JSON.parse(await page.evaluate(extract=>eval(extract),extract));
   expect(missing.error).toContain('尚未找到课表');
   await page.evaluate(()=>{const t=document.createElement('table');t.id='courseTable';document.body.append(t);});
-  const empty=JSON.parse(await page.evaluate(extract=>eval(extract),extract));expect(empty.error).toContain('页面尚无课程');
+  const empty=JSON.parse(await page.evaluate(extract=>eval(extract),extract));expect(empty.code).toBe('EMPTY_TABLE');expect(empty.retryable).toBe(true);
   await page.locator('#portalImport').click();await expect(page.locator('#toast')).toContainText('安卓应用');
+});
+
+test('同源嵌入课表及无固定类名的段落可读取，缺少 Array.at 时仍能预览',async({page})=>{
+  const html=fs.readFileSync(path.join(root,'examples/模拟URP官网.html'),'utf8').replace('id="courseTable"','id="mobileTable"').replace(/class="class_div"/g,'class="mobile-course"');
+  await page.setContent('<iframe id="courseFrame"></iframe>');
+  await page.evaluate(html=>{const doc=document.getElementById('courseFrame').contentDocument;doc.open();doc.write(html);doc.close();},html);
+  const payload=JSON.parse(await page.evaluate(extract=>eval(extract),extract));
+  expect(payload.source).toBe('ytu-urp');
+  await page.goto('/');
+  await page.evaluate(()=>{Array.prototype.at=undefined;});
+  await page.evaluate(payload=>receivePortalImport(payload),payload);
+  await expect(page.locator('#previewList .list-card')).toHaveCount(2);
+  await expect(page.locator('#previewList')).toContainText('教师甲 教师乙');
 });

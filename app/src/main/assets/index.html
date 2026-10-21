@@ -42,7 +42,7 @@
       <p class="small schedule-hint">灰色为非本周课程 · 点击可查看实际上课周次</p>
       <div class="bottom-actions"><button id="addCourseButton" class="button soft">＋ 添加课程</button><button id="allButton" class="button soft">全部课程</button><button id="backupButton" class="button soft">导出备份</button></div>
     </section>
-    <footer>下节啥课 <span>·</span> 让课表回归课表 <span>·</span> v0.2.0</footer>
+    <footer>下节啥课 <span>·</span> 让课表回归课表 <span>·</span> v0.2.1</footer>
   </main>
   <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.html,.htm,.json" hidden>
   <dialog id="importDialog"><div class="dialog-head"><div><p class="eyebrow">IMPORT PREVIEW</p><h2>确认你的课表</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><p id="importFileName" class="small wrap"></p><div id="importSummary" class="summary-row"></div><div id="importWarnings" class="notice warning" hidden></div><label>学期名称<input id="importSemester" maxlength="80" placeholder="例如：2026–2027 学年第一学期"></label><div class="field-row"><label>第一周周一<input id="importStart" type="date" required></label><label>学期总周数<input id="importWeeks" type="number" min="1" max="60" required></label></div><p class="small">请核对第一周日期和节次时间。保存会替换当前课表，原数据可先导出备份。</p><div class="confirm-row"><input id="reviewCheck" type="checkbox"><label for="reviewCheck">我已核对周次、日期和下方课程；知晓未识别的记录不会导入</label></div><div id="previewList" class="course-list"></div><div class="dialog-actions"><button id="cancelImport" class="button soft">取消</button><button id="saveImport" class="button primary">保存到手机</button></div></dialog>

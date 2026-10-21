@@ -11,7 +11,7 @@
   function showDialog(id) {const d=$(id);if(!d.open)d.showModal();}
   function closeDialog(id) {$(id).close();}
   function closeAll() {document.querySelectorAll('dialog[open]').forEach(d=>d.close());}
-  window.handleAndroidBack=()=> {const dialogs=Array.from(document.querySelectorAll('dialog[open]'));if(!dialogs.length)return false;dialogs.at(-1).close();return true;};
+  window.handleAndroidBack=()=> {const dialogs=Array.from(document.querySelectorAll('dialog[open]'));if(!dialogs.length)return false;dialogs[dialogs.length-1].close();return true;};
   function load() {
     try {
       const json=window.AndroidLocal ? AndroidLocal.readState() : localStorage.getItem(KEY);
@@ -132,7 +132,7 @@
     try {
       if(!payload || payload.source!=='ytu-urp' || !Array.isArray(payload.rows) || payload.rows.length>100 || payload.rows.some(row=>!Array.isArray(row)||row.length>32))throw new Error('教务课表数据结构无效');
       preview=T.parseMatrix(payload.rows,payload.merges||[],'烟台大学教务系统');
-      if(!preview.courses.length)throw new Error('没有读取到有效课程，原课表未修改。请确认已进入选课结果并等待课程加载。');
+      if(!preview.courses.length)throw new Error('已读取到 '+(Number(payload.cardCount)||0)+' 个课程卡片，但未能解析上课安排（COURSE_PARSE）。原课表未修改。'+preview.warnings.slice(0,2).join(' '));
       if(Array.isArray(payload.warnings))preview.warnings.push(...payload.warnings.filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,2000)));
       preview.name='烟台大学教务系统';preview.format='官网登录读取（测试）';
       showPreview();
@@ -189,7 +189,7 @@
   document.querySelectorAll('.close-dialog').forEach(button=>button.onclick=()=>button.closest('dialog').close());
   $('cancelImport').onclick=()=>closeDialog('importDialog');$('cancelEdit').onclick=()=>closeDialog('editDialog');$('saveImport').onclick=importSave;
   $('settingsForm').onsubmit=event=>{event.preventDefault();if(persist({...state,semester:$('semesterInput').value,startDate:$('startInput').value,totalWeeks:Number($('weeksInput').value),times:readTimes()},'设置已保存'))closeDialog('settingsDialog');};
-  $('addTimeButton').onclick=()=>{const times=readTimes();if(times.length>=16){toast('最多支持 16 节');return;}const last=times.at(-1),start=(Number(last[1].slice(0,2))*60+Number(last[1].slice(3))+10),end=start+45;if(end>=1440){toast('末节时间已接近午夜，请先调整时间');return;}const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');renderTimes([...times,[hm(start),hm(end)]]);};
+  $('addTimeButton').onclick=()=>{const times=readTimes();if(times.length>=16){toast('最多支持 16 节');return;}const last=times[times.length-1],start=(Number(last[1].slice(0,2))*60+Number(last[1].slice(3))+10),end=start+45;if(end>=1440){toast('末节时间已接近午夜，请先调整时间');return;}const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');renderTimes([...times,[hm(start),hm(end)]]);};
   $('removeTimeButton').onclick=()=>{const times=readTimes();if(times.length<=1){toast('至少保留一节');return;}if(state.courses.some(c=>c.end>=times.length)){toast('末节仍有课程，不能删除');return;}renderTimes(times.slice(0,-1));};
   $('clearButton').onclick=()=>{if(!confirm('确定清空本机课表？建议先取消并导出备份。此操作无法撤销。'))return;if(persist({...state,courses:[],sourceName:''},'课表已清空'))closeAll();};
   $('courseForm').onsubmit=event=>{event.preventDefault();try{const sections=T.parseSections($('courseSections').value);if(!sections)throw new Error('节次格式应为 1-2 或 3');const previous=state.courses.find(c=>c.id===editId);const c=T.validateCourse({id:editId||T.uid(),name:$('courseName').value,teacher:$('courseTeacher').value,room:$('courseRoom').value,day:Number($('courseDay').value),...sections,weeks:T.parseWeeks($('courseWeeks').value),color:previous?previous.color:state.courses.length%8});const courses=editId?state.courses.map(x=>x.id===editId?c:x):[...state.courses,c];if(persist({...state,courses},'课程已保存')){closeDialog('editDialog');renderAll();}}catch(error){toast(error.message);}};

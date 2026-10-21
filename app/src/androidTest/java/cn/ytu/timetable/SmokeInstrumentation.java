@@ -71,6 +71,13 @@ public final class SmokeInstrumentation extends Instrumentation {
                 || PortalImportActivity.allowed("https://jwxs.ytu.edu.cn:8443/")
                 || PortalImportActivity.isResultPage("https://cas.ytu.edu.cn/student/courseSelect/courseSelectResult/index")) throw new AssertionError("Portal URL policy");
             checks++; report.append("✓ 教务网址仅允许两个官方 HTTPS 主机和准确课表路径\n");
+            if (!PortalImportActivity.resourceAllowed("https://cstaticdun.126.net/load.min.js")
+                || !PortalImportActivity.resourceAllowed("https://c.dun.163.com/api/v2/getconf")
+                || !PortalImportActivity.resourceAllowed("https://necaptcha.nosdn.127.net/image.png")
+                || PortalImportActivity.allowed("https://c.dun.163.com/")
+                || PortalImportActivity.resourceAllowed("https://c.dun.163.com.evil.example/")
+                || PortalImportActivity.resourceAllowed("http://cstaticdun.126.net/load.min.js")) throw new AssertionError("Captcha resource policy");
+            checks++; report.append("✓ 易盾 HTTPS 资源可加载，主页面仍限制为学校域名\n");
             Activity offline = activity;
             ActivityMonitor portalMonitor=addMonitor(PortalImportActivity.class.getName(),null,false);
             js("AndroidLocal.importPortal();true");
@@ -79,13 +86,14 @@ public final class SmokeInstrumentation extends Instrumentation {
             if(activity==null)throw new AssertionError("Portal activity not opened");
             final WebView remote=findWeb(activity.getWindow().getDecorView());
             String mock="<table id='courseTable'><tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th></tr><tr><th>第1节</th><td><div class='class_div'><p>官网登录模拟课</p><p>模拟教师*</p><p>1-16周双周</p><p>1-2节</p><p>模拟楼101</p></div></td><td></td><td></td></tr></table>";
-            runOnMainSync(()->remote.loadDataWithBaseURL(PortalImportActivity.RESULT_URL,mock,"text/html","UTF-8",PortalImportActivity.RESULT_URL));
-            await("!!document.getElementById('courseTable')");
+            String delayed="<html><body>课程加载中<script>setTimeout(function(){document.body.innerHTML="+org.json.JSONObject.quote(mock)+";},1800);</script></body></html>";
+            runOnMainSync(()->remote.loadDataWithBaseURL(PortalImportActivity.RESULT_URL,delayed,"text/html","UTF-8",PortalImportActivity.RESULT_URL));
+            await("document.readyState==='complete'");
             check("typeof AndroidLocal==='undefined'", "官网 WebView 无本地存储桥接接口");
             runOnMainSync(()->findReadButton(activity.getWindow().getDecorView()).performClick());
             activity=offline;
             await("document.querySelector('#importDialog').open");
-            check("document.querySelectorAll('#previewList .list-card').length===1 && document.querySelector('#previewList').textContent.includes('模拟教师')", "原生官网读取按钮经 Activity 结果进入课表预览");
+            check("document.querySelectorAll('#previewList .list-card').length===1 && document.querySelector('#previewList').textContent.includes('模拟教师')", "原生读取自动等待异步课程，Activity 结果进入课表预览");
             check("JSON.parse(AndroidLocal.readState()).courses.length===3", "官网读取只打开预览，未确认前不覆盖已有课表");
             js("document.querySelector('#cancelImport').click();true");
             result.putString("stream", "\nPASS: " + checks + " Android checks\n" + report);

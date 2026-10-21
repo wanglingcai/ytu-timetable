@@ -17,11 +17,23 @@ test('周次覆盖连续、单双、指定、离散、中英文标点',()=>{
 test('错误周次不能被默默变成整学期',()=>{
   for(const s of ['','0-18','18-1','1-61','单周','1-18周单双周','第3周和第5周','abc'])assert.throws(()=>T.parseWeeks(s),s);
 });
+
+test('缺少 Array.at 的 WebView 仍可解析课程教师与周次',()=>{
+  const vm=require('node:vm'),sandbox={module:{exports:{}}};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/core.js'),'utf8')+'; Array.prototype.at=undefined;',sandbox);
+  const warnings=[],courses=sandbox.module.exports.parseCell('模拟课程\n模拟教师*\n1-16周\n1-2节\n模拟楼101',1,null,'模拟课表',warnings);
+  assert.equal(courses.length,1);assert.equal(courses[0].teacher,'模拟教师');assert.equal(warnings.length,0);
+});
 test('节次与星期解析',()=>{
   assert.deepEqual(T.parseSections('第1小节(08:00-08:45)'),{start:1,end:1});
   assert.deepEqual(T.parseSections('9-10节'),{start:9,end:10});
   assert.equal(T.parseSections('17-18节'),null);
   assert.equal(T.parseDay('星期日'),7);assert.equal(T.parseDay('周三'),3);assert.equal(T.parseDay('Wednesday'),3);
+});
+
+test('手机网页中的星期表头换行时仍可定位课程列',()=>{
+  const result=T.parseMatrix([['节次','星\n期\n一','星\n期\n二','星\n期\n三'],['第1节','模拟课程\n模拟教师*\n1-16周\n1-2节\n模拟楼101','','']]);
+  assert.equal(result.courses.length,1);assert.equal(result.courses[0].day,1);
 });
 test('URP 单元格保留实际周次、教师和地点',()=>{
   const warnings=[];

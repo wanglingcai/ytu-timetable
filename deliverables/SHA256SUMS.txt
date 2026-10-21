@@ -1,4 +1,5 @@
 931de7d495ad602dc1bfd780a55956d69297e3479fb9d5c5e4c407f9515593cd  next-class-0.1.2-debug.apk
 de89564ab1a1c38a0d6bcad3426d8c1752adc532a66f353b950597e146913c39  next-class-0.2.0-debug.apk
+2ef46125d782bb3ab2cb16ed6fc4522df0e863710c506a0bea9dccdb17cccc3c  next-class-0.2.1-debug.apk
 fd2e84c954df1a1f31c6dbe6e8163fb2155aed10d28dc9965ee5c081ca9411e4  ytu-timetable-0.1.0-debug.apk
 f4a1b786b0ca4884eff4ac7453433139ffc85582fcc4649fdbd91423b75e14ce  ytu-timetable-0.1.1-debug.apk
