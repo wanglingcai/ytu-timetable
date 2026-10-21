@@ -65,6 +65,7 @@ public final class SmokeInstrumentation extends Instrumentation {
             check("document.querySelector('#courseDialog').open && document.querySelector('#courseDetail').textContent.includes('B202')", "原生 WebView 中详情对话框可用");
             js("document.querySelector('#courseDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
             check("document.documentElement.scrollWidth<=innerWidth", "手机界面没有横向溢出");
+            checkAppearance();
             if (!PortalImportActivity.allowed("https://cas.ytu.edu.cn/lyuapServer/login")
                 || !PortalImportActivity.isResultPage(PortalImportActivity.RESULT_URL)
                 || PortalImportActivity.allowed("http://jwxs.ytu.edu.cn/")
@@ -145,6 +146,52 @@ public final class SmokeInstrumentation extends Instrumentation {
             result.putString("stream", "\nFAIL after " + checks + " checks: " + error + "\n" + report);
             finish(Activity.RESULT_CANCELED, result);
         }
+    }
+    private void checkAppearance() throws Exception {
+        String timetable=js("AndroidLocal.readState()");
+        android.content.IntentFilter filter=new android.content.IntentFilter(Intent.ACTION_OPEN_DOCUMENT);
+        filter.addCategory(Intent.CATEGORY_OPENABLE);filter.addDataType("image/*");
+        ActivityMonitor picker=addMonitor(filter,new ActivityResult(Activity.RESULT_CANCELED,null),true);
+        js("document.querySelector('#settingsButton').click();document.querySelector('#chooseBackground').click();true");
+        long until=System.currentTimeMillis()+5000;
+        while(picker.getHits()==0&&System.currentTimeMillis()<until)Thread.sleep(100);
+        removeMonitor(picker);
+        if(picker.getHits()!=1)throw new AssertionError("Wallpaper picker not opened");
+        checks++;report.append("✓ 背景按钮实际调用安卓系统文档选择器，取消后不改背景\n");
+        File source=new File(getTargetContext().getCacheDir(),"synthetic-wallpaper.png");
+        android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(3072,1024,android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas=new android.graphics.Canvas(bitmap);canvas.drawColor(android.graphics.Color.rgb(8,12,30));
+        android.graphics.Paint paint=new android.graphics.Paint();paint.setColor(android.graphics.Color.CYAN);canvas.drawCircle(1000,500,400,paint);
+        try(java.io.FileOutputStream output=new java.io.FileOutputStream(source)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
+        runOnMainSync(()->((MainActivity)activity).onActivityResult(104,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(source))));
+        await("document.body.classList.contains('has-wallpaper') && document.querySelector('#wallpaperImage').complete && document.querySelector('#wallpaperImage').naturalWidth>0");
+        check("document.querySelector('#wallpaperImage').naturalWidth<=2048 && document.querySelector('#wallpaperImage').src.startsWith('file:///android_asset/personal-background.jpg?')","原生导入图片压缩到上限内，私有图片通过 WebView 正常显示");
+        File stored=new File(getTargetContext().getFilesDir(),"background.jpg");byte[] original=Files.readAllBytes(stored.toPath());
+        if(original[0]!=(byte)0xff||original[1]!=(byte)0xd8)throw new AssertionError("Not normalized JPEG");
+        checks++;report.append("✓ 图片在应用私有目录重新编码为 JPEG\n");
+        js("document.querySelector('#backgroundMask').value='80';document.querySelector('#backgroundMask').dispatchEvent(new Event('input'));document.querySelector('#backgroundMask').dispatchEvent(new Event('change'));document.querySelector('#backgroundBlur').value='20';document.querySelector('#backgroundBlur').dispatchEvent(new Event('input'));document.querySelector('#backgroundBlur').dispatchEvent(new Event('change'));true");
+        check("JSON.parse(AndroidLocal.readAppearance()).mask===80 && JSON.parse(AndroidLocal.readAppearance()).blur===20","遮罩和模糊滑块立即写入原生外观存储");
+        check("!AndroidLocal.saveAppearance('{\"mask\":81,\"blur\":0}') && !AndroidLocal.saveAppearance('{\"mask\":35,\"blur\":-1}') && JSON.parse(AndroidLocal.readAppearance()).mask===80","非法外观参数被拒绝，保留已保存值");
+        runOnMainSync(()->activity.finish());waitForIdleSync();launch();
+        await("document.readyState==='complete' && document.body.classList.contains('has-wallpaper') && document.querySelector('#wallpaperImage').naturalWidth>0");
+        check("document.querySelector('#backgroundMask').value==='80' && document.querySelector('#backgroundBlur').value==='20'","重建 Activity 后恢复图片和外观设置");
+        check("AndroidLocal.readState()==="+timetable,"调整和恢复外观不修改课表文件");
+        String revision=AppearanceStore.read(getTargetContext()).toString();
+        File corrupt=new File(getTargetContext().getCacheDir(),"corrupt-wallpaper.png");Files.write(corrupt.toPath(),new byte[]{1,2,3});
+        runOnMainSync(()->((MainActivity)activity).onActivityResult(104,Activity.RESULT_OK,new Intent().setData(Uri.fromFile(corrupt))));
+        await("!document.querySelector('#toast').hidden && document.querySelector('#toast').textContent.includes('有效的照片')");
+        if(!java.util.Arrays.equals(original,Files.readAllBytes(stored.toPath()))||!revision.equals(AppearanceStore.read(getTargetContext()).toString()))throw new AssertionError("Invalid image changed original");
+        checks++;report.append("✓ 损坏图片返回错误，原背景文件与设置完全保留\n");
+        boolean oversizedRejected=false;
+        try{AppearanceStore.importImage(getTargetContext(),new java.io.ByteArrayInputStream(new byte[12*1024*1024+1]));}catch(java.io.IOException expected){oversizedRejected=true;}
+        if(!oversizedRejected||!java.util.Arrays.equals(original,Files.readAllBytes(stored.toPath())))throw new AssertionError("Oversized image handling");
+        checks++;report.append("✓ 超过 12 MB 的图片被拒绝，原背景保留\n");
+        js("document.querySelector('#settingsButton').click();document.querySelector('#resetBackground').click();true");
+        await("!document.body.classList.contains('has-wallpaper') && document.querySelector('#backgroundMask').value==='35' && document.querySelector('#backgroundBlur').value==='0'");
+        if(stored.exists())throw new AssertionError("Private background not removed");
+        checks++;report.append("✓ 恢复默认删除私有图片并重置遮罩与模糊\n");
+        check("AndroidLocal.readState()==="+timetable,"选图失败和恢复默认后课程与个人安排完整保留");
+        js("document.querySelector('#settingsDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
     }
     private void launch() {
         Intent intent=getTargetContext().getPackageManager().getLaunchIntentForPackage(getTargetContext().getPackageName());

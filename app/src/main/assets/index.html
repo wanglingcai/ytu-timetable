@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="theme-color" content="#f7f7f1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#f4f8ff">
   <title>下节啥课 · 离线课程表</title>
   <link rel="stylesheet" href="style.css">
   <script src="vendor/xlsx.full.min.js" defer></script>
   <script src="core.js" defer></script>
+  <script src="appearance.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
+  <div id="wallpaper" class="wallpaper" aria-hidden="true" hidden><img id="wallpaperImage" alt=""><div class="wallpaper-mask"></div></div>
   <main class="shell">
     <header class="masthead">
       <div class="brand"><span class="brand-mark" aria-hidden="true">课</span><div><h1>下节啥课</h1><p id="semesterLabel" class="semester-name">我的课表</p></div></div>
@@ -43,7 +45,7 @@
       <p class="small schedule-hint">点击空白格添加个人安排 · 灰色为非本周课程</p>
 
     </section>
-    <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.5.0</footer>
+    <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.6.0</footer>
   </main>
   <nav class="quickbar" aria-label="课表操作"><button id="allButton" class="quick-action">全部安排</button><button id="addButton" class="add-button" aria-label="添加课程或个人安排"><span aria-hidden="true">＋</span> 添加</button><button id="backupButton" class="quick-action">导出备份</button></nav>
   <dialog id="importChoice" class="bottom-sheet choice-sheet" aria-labelledby="importChoiceTitle">
@@ -57,9 +59,10 @@
     <button id="addPersonalButton" class="choice-option"><span class="choice-icon" aria-hidden="true">＋</span><span><strong>个人安排</strong><small>自习、运动，或留给自己的时间</small></span><span aria-hidden="true">›</span></button>
     <button id="addCourseButton" class="choice-option"><span class="choice-icon" aria-hidden="true">课</span><span><strong>添加课程</strong><small>手动补充课程、教师与教室</small></span><span aria-hidden="true">›</span></button>
   </dialog>
+  <input id="backgroundInput" type="file" accept="image/*" hidden>
   <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.html,.htm,.json" hidden>
   <dialog id="importDialog"><div class="dialog-head"><div><p class="eyebrow">IMPORT PREVIEW</p><h2>确认你的课表</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><p id="importFileName" class="small wrap"></p><div id="importSummary" class="summary-row"></div><div id="importWarnings" class="notice warning" hidden></div><label>学期名称<input id="importSemester" maxlength="80" placeholder="例如：2026–2027 学年第一学期"></label><div class="field-row"><label>第一周周一<input id="importStart" type="date" required></label><label>学期总周数<input id="importWeeks" type="number" min="1" max="60" required></label></div><p id="importHint" class="small"></p><div class="confirm-row"><input id="reviewCheck" type="checkbox"><label for="reviewCheck">我已核对周次、日期和下方课程；知晓未识别的记录不会导入</label></div><div id="previewList" class="course-list"></div><div class="dialog-actions"><button id="cancelImport" class="button soft">取消</button><button id="saveImport" class="button primary">保存到手机</button></div></dialog>
-  <dialog id="settingsDialog"><div class="dialog-head"><div><p class="eyebrow">SEMESTER SETTINGS</p><h2>学期与时间</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><form id="settingsForm"><label>学期名称<input id="semesterInput" maxlength="80" required></label><div class="field-row"><label>第一周周一<input id="startInput" type="date" required></label><label>学期总周数<input id="weeksInput" type="number" min="1" max="60" required></label></div><p class="small">第一周周一决定“本周”的计算。开学日不是周一时，请填该周周一。</p><h3>提醒设置</h3><label>课程提醒<select id="courseReminder"><option value="-1">关闭</option><option value="0">准点提醒</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option></select></label><p class="small">课程统一使用此设置，个人安排在编辑时单独选择。保存设置后生效；按实际周次和节次时间提醒。</p><p id="reminderStatus" class="notice" role="status"></p><div class="time-actions"><button id="notificationPermission" type="button" class="button soft">开启通知</button><button id="exactReminderPermission" type="button" class="button soft">开启准时提醒</button></div><h3>节次时间</h3><p class="small">默认时间仅供参考，请按学校或校区实际作息核对。</p><div id="timeInputs"></div><div class="time-actions"><button id="addTimeButton" type="button" class="text-button">＋ 增加一节</button><button id="removeTimeButton" type="button" class="text-button">减少末节</button></div><div class="dialog-actions"><button type="button" id="clearButton" class="button danger">清空课表</button><button class="button primary" type="submit">保存设置</button></div></form><p class="small">数据只保存在本机，卸载或清除应用数据前请导出备份。应用不会自动获知学校调课。</p><p class="small">Excel 解析：SheetJS CE 0.20.3 · Apache-2.0</p></dialog>
+  <dialog id="settingsDialog"><div class="dialog-head"><div><p class="eyebrow">SEMESTER SETTINGS</p><h2>学期与时间</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><form id="settingsForm"><label>学期名称<input id="semesterInput" maxlength="80" required></label><div class="field-row"><label>第一周周一<input id="startInput" type="date" required></label><label>学期总周数<input id="weeksInput" type="number" min="1" max="60" required></label></div><p class="small">第一周周一决定“本周”的计算。开学日不是周一时，请填该周周一。</p><h3>自定义背景图</h3><div class="appearance-settings"><div class="appearance-actions"><button id="chooseBackground" type="button" class="button soft">从相册或图片文件选择</button><button id="resetBackground" type="button" class="button soft">恢复默认背景</button></div><label for="backgroundMask">白色遮罩 <output id="maskValue" for="backgroundMask">35%</output></label><input id="backgroundMask" type="range" min="0" max="80" step="1" value="35"><label for="backgroundBlur">背景模糊 <output id="blurValue" for="backgroundBlur">0px</output></label><input id="backgroundBlur" type="range" min="0" max="20" step="1" value="0"><p id="backgroundStatus" class="small" role="status"></p><p class="small">背景只保存在本机，不包含在课表 JSON 备份里。遮罩越高，图片越淡。</p></div><h3>提醒设置</h3><label>课程提醒<select id="courseReminder"><option value="-1">关闭</option><option value="0">准点提醒</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option></select></label><p class="small">课程统一使用此设置，个人安排在编辑时单独选择。保存设置后生效；按实际周次和节次时间提醒。</p><p id="reminderStatus" class="notice" role="status"></p><div class="time-actions"><button id="notificationPermission" type="button" class="button soft">开启通知</button><button id="exactReminderPermission" type="button" class="button soft">开启准时提醒</button></div><h3>节次时间</h3><p class="small">默认时间仅供参考，请按学校或校区实际作息核对。</p><div id="timeInputs"></div><div class="time-actions"><button id="addTimeButton" type="button" class="text-button">＋ 增加一节</button><button id="removeTimeButton" type="button" class="text-button">减少末节</button></div><div class="dialog-actions"><button type="button" id="clearButton" class="button danger">清空课表</button><button class="button primary" type="submit">保存设置</button></div></form><p class="small">数据只保存在本机，卸载或清除应用数据前请导出备份。应用不会自动获知学校调课。</p><p class="small">Excel 解析：SheetJS CE 0.20.3 · Apache-2.0</p></dialog>
   <dialog id="courseDialog"><div class="dialog-head"><h2 id="courseDialogTitle">课程详情</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div><div id="courseDetail"></div></dialog>
   <dialog id="editDialog" class="bottom-sheet editor-sheet" aria-labelledby="editTitle">
     <div class="sheet-handle" aria-hidden="true"></div>

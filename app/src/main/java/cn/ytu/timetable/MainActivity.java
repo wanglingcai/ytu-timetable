@@ -27,7 +27,7 @@ import java.util.concurrent.Executors;
 
 /** Offline UI. Only packaged assets are allowed to run beside the private storage bridge. */
 public final class MainActivity extends Activity {
-    private static final int PICK_FILE = 100, SAVE_BACKUP = 101, IMPORT_PORTAL = 102;
+    private static final int PICK_FILE = 100, SAVE_BACKUP = 101, IMPORT_PORTAL = 102, PICK_BACKGROUND=104;
     private static final int MAX_IMPORT_BYTES = 12 * 1024 * 1024;
     private static final int MAX_STATE_BYTES = 4 * 1024 * 1024;
     private WebView web;
@@ -41,13 +41,13 @@ public final class MainActivity extends Activity {
     @SuppressLint("SetJavaScriptEnabled") // Packaged local UI requires JS; network/navigation blocked, imports rendered as text.
     @Override public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
-        getWindow().setStatusBarColor(Color.rgb(247, 247, 241));
-        getWindow().setNavigationBarColor(Color.rgb(247, 247, 241));
+        getWindow().setStatusBarColor(Color.rgb(244, 248, 255));
+        getWindow().setNavigationBarColor(Color.rgb(244, 248, 255));
         getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         stateFile = new AtomicFile(new File(getFilesDir(), "timetable.json"));
         captureReminder(getIntent());
         web = new WebView(this);
-        web.setBackgroundColor(Color.rgb(247, 247, 241));
+        web.setBackgroundColor(Color.rgb(244, 248, 255));
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -69,6 +69,10 @@ public final class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { return true; }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String uri = request.getUrl().toString();
+                if(AppearanceStore.IMAGE_URL.equals(uri.split("\\?",2)[0])) {
+                    try {return new WebResourceResponse("image/jpeg",null,200,"OK",java.util.Collections.singletonMap("Cache-Control","no-store"),AppearanceStore.openImage(MainActivity.this));}
+                    catch(IOException missing){return new WebResourceResponse("image/jpeg",null,new ByteArrayInputStream(new byte[0]));}
+                }
                 if (uri.startsWith("file:///android_asset/")) return null;
                 return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream(new byte[0]));
             }
@@ -84,7 +88,7 @@ public final class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new LocalBridge(), "AndroidLocal");
         FrameLayout container = new FrameLayout(this);
-        container.setBackgroundColor(Color.rgb(247, 247, 241));
+        container.setBackgroundColor(Color.rgb(244, 248, 255));
         container.addView(web, new FrameLayout.LayoutParams(-1, -1));
         container.setOnApplyWindowInsetsListener((view, insets) -> {
             if (android.os.Build.VERSION.SDK_INT >= 30) {
@@ -132,6 +136,14 @@ public final class MainActivity extends Activity {
     }
 
     public final class LocalBridge {
+        @JavascriptInterface public String readAppearance(){return AppearanceStore.read(MainActivity.this).toString();}
+        @JavascriptInterface public boolean saveAppearance(String json){return AppearanceStore.save(MainActivity.this,json);}
+        @JavascriptInterface public void chooseBackground() {
+            runOnUiThread(()->{try{startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE),PICK_BACKGROUND);}catch(Exception failed){error("无法打开系统图片选择器。");}});
+        }
+        @JavascriptInterface public void clearBackground() {
+            worker.execute(()->{try{AppearanceStore.clear(MainActivity.this);event("receiveAppearance",AppearanceStore.read(MainActivity.this));}catch(Exception failed){error("恢复默认背景失败，请重试。");}});
+        }
         @JavascriptInterface public String reminderStatus() {return ReminderScheduler.status(MainActivity.this);}
         @JavascriptInterface public void reminderPermission(String kind) {
             runOnUiThread(()->{
@@ -219,6 +231,14 @@ public final class MainActivity extends Activity {
         }
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
+        if(request==PICK_BACKGROUND) {
+            worker.execute(()->{
+                try(InputStream input=getContentResolver().openInputStream(uri)) {
+                    if(input==null)throw new IOException("无法读取这张图片");
+                    AppearanceStore.importImage(MainActivity.this,input);event("receiveAppearance",AppearanceStore.read(MainActivity.this));
+                }catch(Exception failed){error(failed.getMessage()==null?"背景图片读取失败，原背景未修改。":failed.getMessage());}
+            });return;
+        }
         if (request == PICK_FILE) worker.execute(() -> {
             try (InputStream input = getContentResolver().openInputStream(uri)) {
                 if (input == null) throw new IOException();

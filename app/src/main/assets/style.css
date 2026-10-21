@@ -147,3 +147,93 @@ footer { margin-top:20px; font-size:9px; }
 .editor-sheet .dialog-actions { position:static; flex-shrink:0; margin-top:10px; padding:12px 0 0; }
 
 .editor-fields input:focus-visible,.editor-fields select:focus-visible,.editor-fields textarea:focus-visible { outline:2px solid #86a58b; outline-offset:-2px; }
+
+/* Vibrant theme tokens and the stable name-hash palette. */
+:root {
+  --bg:#f4f8ff; --ink:#15364b; --muted:#4c647b; --line:#d9e5f2; --green:#096dc7;
+  --primary-gradient:linear-gradient(135deg,#0077b6,#1765f2); --primary-shadow:0 8px 24px #1479ed30;
+  --blue-bg:#e0f2fe; --blue-fg:#0369a1; --blue-accent:#0284c7;
+  --mint-bg:#dcfce7; --mint-fg:#15803d; --mint-accent:#16a34a;
+  --orange-bg:#ffedd5; --orange-fg:#c2410c; --orange-accent:#ea580c;
+  --pink-bg:#fce7f3; --pink-fg:#be185d; --pink-accent:#db2777;
+  --purple-bg:#f3e8ff; --purple-fg:#7e22ce; --purple-accent:#9333ea;
+  --yellow-bg:#fef9c3; --yellow-fg:#a16207; --yellow-accent:#ca8a04;
+  --teal-bg:#ccfbf1; --teal-fg:#0f766e; --teal-accent:#0d9488;
+  --indigo-bg:#e0e7ff; --indigo-fg:#4338ca; --indigo-accent:#6366f1;
+}
+.palette-0 { --course-bg:var(--blue-bg); --course-fg:var(--blue-fg); --course-accent:var(--blue-accent); }
+.palette-1 { --course-bg:var(--mint-bg); --course-fg:var(--mint-fg); --course-accent:var(--mint-accent); }
+.palette-2 { --course-bg:var(--orange-bg); --course-fg:var(--orange-fg); --course-accent:var(--orange-accent); }
+.palette-3 { --course-bg:var(--pink-bg); --course-fg:var(--pink-fg); --course-accent:var(--pink-accent); }
+.palette-4 { --course-bg:var(--purple-bg); --course-fg:var(--purple-fg); --course-accent:var(--purple-accent); }
+.palette-5 { --course-bg:var(--yellow-bg); --course-fg:var(--yellow-fg); --course-accent:var(--yellow-accent); }
+.palette-6 { --course-bg:var(--teal-bg); --course-fg:var(--teal-fg); --course-accent:var(--teal-accent); }
+.palette-7 { --course-bg:var(--indigo-bg); --course-fg:var(--indigo-fg); --course-accent:var(--indigo-accent); }
+[class*=palette-] { background:var(--course-bg); color:var(--course-fg); }
+body { isolation:isolate; }
+.shell { position:relative; z-index:1; }
+.brand-mark,.next-card,.add-button,.button.primary { background:var(--primary-gradient); color:white; box-shadow:var(--primary-shadow); }
+.next-top,.next-meta,.next-arrow { color:#fff; opacity:1; }
+.countdown { color:white; background:#ffffff26; }
+.soft { background:#e4efff; color:#155ca3; }
+.week-card,dialog,.list-card { background:#fff; }
+.schedule-wrap { background:#fff; border-color:#dce7f3; }
+.day-head { background:#f0f6ff; color:#426079; }
+.day-head .date { color:#536b83; }
+.day-head.today { background:transparent; color:#0369a1; }
+.day-head.today>span:first-child { background:#0369a1; color:white; padding:2px 7px; border-radius:12px; }
+.grid-slot.today-column,.grid-slot.empty-slot.today-column { background:linear-gradient(180deg,#38bdf81a,#38bdf808); }
+.day-head.today .date { color:#0369a1; }
+.time-label { background:#f5f8fd; color:#395c78; border-color:#dfe8f2; }
+.time-label span { color:#566f87; }
+.grid-slot { border-color:#e5edf5; }
+.legend-active { background:#38bdf8; }
+.legend-inactive { background:#f1f5f9; border-color:#cbd5e1; }
+.quickbar { background:#ffffffed; border-color:#d9e9fa; box-shadow:0 8px 30px #2563eb18; }
+.quick-action { color:#345f86; }
+.dialog-actions { background:#fff; }
+.choice-option { background:#f3f8ff; }
+.choice-icon,.edit-context,.repeat-controls,.notice:not(.warning) { background:#eaf3ff; color:#23567e; }
+.repeat-controls button { color:#3e6483; }
+.repeat-controls button[aria-pressed=true] { color:#075caa; background:#fff; }
+input:not([type=checkbox]),select:not(#weekSelect),textarea { background:#fff; border-color:#d6e3f1; }
+#notesDetails summary { color:#386184; }
+.grid-slot.empty-slot:hover,.grid-slot.empty-slot:focus-visible { background:#ddebff; outline-color:#66a5eb; }
+#scheduleGrid .course-card { display:flex; flex-direction:column; padding:4px 5px; gap:4px; border:0; border-left:3px solid var(--course-accent); color:var(--course-fg); background:var(--course-bg); line-height:1.2; }
+#scheduleGrid .course-card strong { flex:0 0 auto; font-size:10.5px; line-height:1.2; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:var(--title-lines,3); max-height:calc(var(--title-lines,3) * 1.2em); overflow:hidden; overflow-wrap:anywhere; min-height:0; }
+#scheduleGrid .course-card small { display:block; flex:0 0 auto; margin-top:auto; font-size:8.5px; line-height:1.2; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; min-width:0; opacity:1; }
+#scheduleGrid .course-card .course-status { flex:0 0 auto; font-size:8px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#scheduleGrid .course-card.conflict { outline:1px solid #b45309; outline-offset:-1px; }
+#scheduleGrid .course-card.inactive,.time-chip.inactive { background:rgba(241,245,249,.65); color:#64748b; border:1px dashed #cbd5e1; }
+.list-card.inactive { background:#f1f5f9a6; border-color:#d6dfeb; color:#64748b; }
+.list-card.inactive p { color:#64748b; }
+.appearance-settings { padding:13px; border:1px solid var(--line); border-radius:14px; background:#f5f9ff; }
+.appearance-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.appearance-actions .button { font-size:11px; padding:8px 10px; }
+.appearance-settings output { float:right; font-size:12px; color:#096dc7; }
+.appearance-settings input[type=range] { appearance:auto; accent-color:#0878d7; padding:0; border:0; background:transparent; width:100%; min-height:34px; margin:3px 0; cursor:pointer; }
+.appearance-settings .small { margin-top:6px; }
+.wallpaper { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+.wallpaper>img { position:absolute; left:-40px; top:-40px; width:calc(100% + 80px); height:calc(100% + 80px); object-fit:cover; filter:blur(var(--wallpaper-blur,0px)); }
+.wallpaper-mask { position:absolute; inset:0; background:rgba(255,255,255,var(--wallpaper-mask,.35)); }
+.has-wallpaper .masthead,.has-wallpaper .week-card,.has-wallpaper .quickbar {
+  background:rgba(255,255,255,.8); border:1px solid rgba(255,255,255,.6); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:0 5px 22px #123c7114;
+}
+.has-wallpaper .masthead { padding:6px 8px; border-radius:17px; }
+.has-wallpaper .schedule-wrap { background:rgba(255,255,255,.55); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-color:#ffffff99; }
+.has-wallpaper .grid-slot { border-color:rgba(0,0,0,.05); }
+.has-wallpaper .day-head,.has-wallpaper .time-label { background:rgba(255,255,255,.65); border-color:rgba(0,0,0,.05); }
+.has-wallpaper .day-head.today { background:linear-gradient(#38bdf81f,#38bdf81f),rgba(255,255,255,.8); }
+.has-wallpaper .day-head { color:#294c67; }
+.has-wallpaper .day-head .date,.has-wallpaper .time-label span,.has-wallpaper .semester-name,.has-wallpaper .week-card .small { color:#3b526b; }
+.has-wallpaper .quick-action { color:#254f75; }
+.nav-button { color:#405c74; }
+.has-wallpaper .empty-state { background:rgba(255,255,255,.92); border-radius:20px; padding:24px 12px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.has-wallpaper .section-heading,.has-wallpaper .schedule-legend,.has-wallpaper .schedule-hint,.has-wallpaper footer,.has-wallpaper .quiet-card,.has-wallpaper .day-list h3 {
+  background:rgba(255,255,255,.84); border-radius:10px; padding:4px 9px; color:#254b68; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+.has-wallpaper #scheduleGrid .course-card.inactive,.has-wallpaper .list-card.inactive { background:rgba(241,245,249,.9); color:#526277; }
+.has-wallpaper .list-card.inactive p { color:#526277; }
+.has-wallpaper .list-card { background:rgba(255,255,255,.88); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.has-wallpaper dialog { background:rgba(255,255,255,.96); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+@supports not (backdrop-filter:blur(1px)) { .has-wallpaper .schedule-wrap { background:rgba(255,255,255,.9); } }

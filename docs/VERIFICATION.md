@@ -2,6 +2,20 @@
 
 更新日期：2026-10-21（Asia/Shanghai）。初版及 0.1.2 的检查于 2026-10-20 完成，0.2.0 检查跨至 2026-10-21。初版使用自造模拟课表；另在本机核对过一份图片型 PDF，经人工转换后验证了 CSV 导入。个人数据和专用核对记录不上传 GitHub。
 
+## 0.6.0 鲜亮配色、自定义背景与课程文字布局
+
+- 更新为蓝色渐变预告卡与主按钮，课程采用 8 组按名称固定分配的配色；非本周仍为浅灰虚线。今天表头使用胶囊、今天列使用微弱青色渐变。
+- 课程格采用纵向弹性布局、4px/5px 内边距、1.2 行高，标题最多三行。根据卡片高度保留完整文字行和独立地点；极短的堆叠卡片可隐藏状态或地点，完整信息可点详情或切换列表。网格仅隐藏学校课程名末尾 `_数字`，原始数据、列表、详情、备份及个人安排名称保持原文。
+- 设置支持安卓系统图片选择器、白色遮罩 0–80%（默认 35%）、模糊 0–20px（默认 0px）、自动保存及恢复默认。图片限 12 MB、宽高不超过 20000 像素，安卓采样至最长边不超过 2048 像素，使用 AndroidX ExifInterface 1.4.2 读取方向后重新编码 JPEG；私有图片与外观参数和课表 JSON 分开保存，无新增相册或全盘访问权限。
+- 壁纸启用后，课表外框、周次栏和底栏采用毛玻璃；课程保留明确色底，日期、时间与标题提供衬底。已查看纯白、深色和高对比棋盘模拟壁纸，测试遮罩 0/80 与模糊 0/20 边界；8 组课程文字配色，以及深色壁纸、0 遮罩下选取的日期/时间/页眉/底栏小字，计算对比度至少 4.5:1。该计算使用合成后的 CSS 底色，不代表所有设备上的逐像素测量。
+- 26 项核心测试通过。22 项仓库通用浏览器测试通过，本机另有 2 项私有样本测试通过，共 24 项；新增覆盖 320/393/768 像素下长标题、单节、堆叠与冲突卡片无重叠、完整行、原名保留，浏览器 IndexedDB 图片持久化、滑块、取消/坏图不覆盖、恢复默认、备份不带图片及对比度检查。
+- Android 15 模拟器 33 项冒烟检查通过，新增 11 项选图与图片处理检查：实际按钮调出系统选择器并取消，通过 Activity 图片结果导入模拟 PNG，私有 JPEG 在 WebView 显示、尺寸上限、参数保存及非法参数拒绝、Activity 重建恢复、损坏/超限文件保留旧背景、恢复默认删除图片、课表数据不变。原有官网读取、个人安排及真实软键盘检查继续通过。
+- 从 0.5.0 模拟课表覆盖安装 0.6.0，私有课表 SHA-256 一致，4 项升级检查通过。构建与 Lint 通过，只有原有 OldTargetApi 提醒；已检查安装包版本 0.6.0 / versionCode 10、v2 签名及权限。
+- 最终安装包 36 项原生提醒检查回归通过，包含实际到点投递、关闭界面送达、通知点击定位以及修改/导入/清空后的重新调度。本轮未修改提醒计算规则。
+- 验证边界：使用模拟图片和专用模拟器，未在用户实体手机验证相册提供方、HEIC 等特定格式或其他 WebView 的毛玻璃效果；不支持的图片会明确报错。浏览器在解码后缩图，超大图片的解码内存仍受浏览器限制。背景不随 JSON 备份迁移，应用卸载/清数据后需重新选择。
+
+预览：[毛玻璃课表](wallpaper-phone.png) · [背景设置](appearance-settings-phone.png)（模拟数据、程序绘制示意背景）。
+
 ## 0.5.0 日常首页、课表和添加面板
 
 - 首页收紧标题、学期和导入入口，新增“接下来/此刻”卡片。按真实日期和实际周次选择最近尚未结束的一项，包含进行中的安排、时间地点和倒计时；查看其他周不改变卡片依据的真实时间，点击卡片跳转到发生日期详情。前台每 30 秒更新，跨日刷新今天标记。
@@ -102,7 +116,7 @@ npm.cmd test
 
 0.1.1 新增非本周课程的视图标记、原数据不变、同一时段本周/非本周卡片上下排列与本周优先、单双周不误报冲突的校验。
 
-### 手机尺寸浏览器测试：仓库通用测试 18 项通过
+### 手机尺寸浏览器测试：仓库通用测试 22 项通过
 
 ```powershell
 npm.cmd run test:ui
@@ -116,7 +130,7 @@ npm.cmd run test:ui
 
 0.2.0 新增两项通用官网 DOM 提取和失败处理测试，覆盖密码框及个人资料不被采集、同格多门课程、合并行、多位教师、未显示课程提示、预览确认与保存、失败不覆盖数据。另增加本机真实选课网页的独立测试，不随仓库分发。
 
-### Android 原生 Instrumentation：22 项通过，覆盖安装检查 4 项通过
+### Android 原生 Instrumentation：33 项通过，覆盖安装检查 4 项通过
 
 使用 Android 15（API 35）、x86_64、Pixel 6 模拟器和系统 WebView。测试验证首次空态、原生流读取 CSV、私有目录写入、单双/指定周、非本周灰色卡片与详情标记、Activity 重建恢复、详情对话框和手机布局。
 
@@ -134,9 +148,9 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 & $taskAdb -s emulator-5554 shell am instrument -w cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
 ```
 
-成功输出：`PASS: 22 Android checks`。键盘检查需要模拟器开启软键盘；上述 `show_ime_with_hard_keyboard` 设置仅用于专用模拟器。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
+成功输出：`PASS: 33 Android checks`。清空后请等待系统进程结束再运行 Instrumentation，避免清数据操作异步结束测试进程。键盘检查需要模拟器开启软键盘；上述 `show_ime_with_hard_keyboard` 设置仅用于专用模拟器。覆盖安装后可额外执行 `adb shell am instrument -w -e verifyExisting true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation`，成功输出 `PASS: 4 Android upgrade checks`，要求模拟器已保存含非本周安排的课表，不能先清空数据。此自定义 Instrumentation 不依赖 JUnit/AndroidX Test，不使用 `connectedDebugAndroidTest` 的 JUnit 结果发现机制。
 
-本轮最终 APK 的升级检查先在 0.4.0 上运行 `-e reminders upgradeSeed`，通过旧版存储桥接写入日期为 2026-08-31、只在第 1/3 周上课的模拟课程，再覆盖安装 0.5.0；检查当日为第 8 周，具有灰色课程。此模式会替换专用模拟器的数据，仅用于准备升级样本，不应在真实手机运行。安装前后私有文件 SHA-256 一致，最终交付 APK 的 4 项升级检查通过。
+本轮最终 APK 的升级检查先在 0.5.0 上运行 `-e reminders upgradeSeed`，通过旧版存储桥接写入日期为 2026-08-31、只在第 1/3 周上课的模拟课程，再覆盖安装 0.6.0；检查当日为第 8 周，具有灰色课程。此模式会替换专用模拟器的数据，仅用于准备升级样本，不应在真实手机运行。安装前后私有文件 SHA-256 一致，最终交付 APK 的 4 项升级检查通过。
 
 ### 安卓提醒专项检查
 
@@ -173,8 +187,8 @@ $taskAdb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
 
 界面截图（均为模拟数据）：
 
-- [首次打开空态](empty-phone.png)
-- [周视图](schedule-phone.png)
+- [首次打开空态（初版历史截图）](empty-phone.png)
+- [周视图（初版历史截图）](schedule-phone.png)
 - [安卓原生文件导入预览（初版历史截图）](android-import-preview.png)
 - [非本周课程灰色显示（当前名称）](inactive-courses-phone.png)
 

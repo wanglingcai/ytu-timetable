@@ -111,7 +111,7 @@
       if(count>1){card.style.width='calc('+(100/count)+'% - 2px)';card.style.marginLeft='calc('+(100*index/count)+'% + 1px)';}
       if(inactive)card.append(el('span','course-status','非本周'));
       else if(c.kind==='personal')card.append(el('span','course-status','个人'));
-      append(card,el('strong','',c.name),el('small','',c.room||'地点待定'));
+      append(card,el('strong','',c.kind==='personal'?c.name:(c.name.replace(/_\d+$/,'')||c.name)),el('small','',c.room||'地点待定'));
       card.addEventListener('click',()=>detail(c.id));
       if(position.stackKey) {
         let host=stacks.get(position.stackKey);
@@ -119,6 +119,21 @@
         card.classList.add('stacked');card.style.top=(position.stackOffset*100)+'%';card.style.height='calc('+(position.stackSize*100)+'% - 3px)';host.append(card);
       } else grid.append(card);
     }
+    fitCourseCards();
+  }
+  function fitCourseCards() {
+    const measurements=Array.from($('scheduleGrid').querySelectorAll('.course-card'),card=>{
+      if(!card.clientHeight)return null;
+      const title=card.querySelector('strong'),room=card.querySelector('small'),status=card.querySelector('.course-status');
+      const css=getComputedStyle(card),line=parseFloat(getComputedStyle(title).lineHeight),roomHeight=parseFloat(getComputedStyle(room).lineHeight),statusHeight=status?parseFloat(getComputedStyle(status).lineHeight):0,gap=parseFloat(css.gap)||4;
+      const available=card.clientHeight-parseFloat(css.paddingTop)-parseFloat(css.paddingBottom);
+      let showStatus=!!status,showRoom=true;
+      if(available<line+roomHeight+gap+(status?statusHeight+gap:0))showStatus=false;
+      if(available<line+roomHeight+gap)showRoom=false;
+      const reserved=(showStatus?statusHeight+gap:0)+(showRoom?roomHeight+gap:0);
+      return {card,title,room,status,showRoom,showStatus,lines:Math.min(3,Math.max(1,Math.floor((available-reserved+.1)/line))),hideTitle:available<line};
+    });
+    measurements.filter(Boolean).forEach(item=>{item.card.style.setProperty('--title-lines',item.lines);item.room.hidden=!item.showRoom;if(item.status)item.status.hidden=!item.showStatus;item.title.style.visibility=item.hideTitle?'hidden':'';});
   }
   function courseRow(c,withWeeks=false) {
     const inactive=!c.weeks.includes(week);
@@ -313,6 +328,7 @@
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();refreshReminderStatus();}});
   function sizeViewport(){document.documentElement.style.setProperty('--visual-height',Math.floor(window.visualViewport?window.visualViewport.height:window.innerHeight)+'px');}
   window.addEventListener('resize',sizeViewport);if(window.visualViewport)window.visualViewport.addEventListener('resize',sizeViewport);sizeViewport();
+  if(window.ResizeObserver)new ResizeObserver(fitCourseCards).observe($('scheduleGrid'));else window.addEventListener('resize',fitCourseCards);
   load();render();refreshReminderStatus();
   setInterval(()=>{if(!document.hidden){if(renderedDate!==T.dateString(new Date()))render();else updateTimeCues();}},30000);
 })();
