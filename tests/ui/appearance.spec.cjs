@@ -37,7 +37,7 @@ test('长标题、单节和堆叠卡片在各屏宽保留完整行，地点无�
       const line=parseFloat(getComputedStyle(title).lineHeight),padding=parseFloat(getComputedStyle(card).paddingBottom);
       if(getComputedStyle(title).visibility==='hidden')return true;
       if(r.height>line*3+.6||Math.abs(r.height/line-Math.round(r.height/line))>.08||r.bottom>b.bottom-padding+.6)return false;
-      if(!room.hidden){const s=room.getBoundingClientRect();if(s.top-r.bottom<3.5||s.bottom>b.bottom-padding+.6)return false;}
+      if(!room.hidden){const s=room.getBoundingClientRect();if(s.top-r.bottom<3.5||s.top-r.bottom>4.6||s.bottom>b.bottom-padding+.6)return false;}
       return true;
     }))).toBe(true);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -63,7 +63,7 @@ test('图片、遮罩与模糊本地持久化；损坏图片保留原背景，�
   const file=await(await download).createReadStream();let json='';for await(const chunk of file)json+=chunk;
   expect(JSON.parse(json).courses).toHaveLength(6);expect(json).not.toMatch(/imageUrl|wallpaper|background\.jpg|blob:/);
   await page.locator('#settingsButton').click();await page.locator('#resetBackground').click();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);
-  await expect(page.locator('#backgroundMask')).toHaveValue('35');await expect(page.locator('#backgroundBlur')).toHaveValue('0');
+  await expect(page.locator('#backgroundMask')).toHaveValue('80');await expect(page.locator('#backgroundBlur')).toHaveValue('0');
   await page.reload();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);
   expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(before);
 });
@@ -75,12 +75,12 @@ test('暗色、纯白与高对比壁纸下的文字衬底和玻璃界面',async(
     await page.locator('#backgroundBlur').fill('0');await page.locator('#backgroundBlur').dispatchEvent('change');
     await page.locator('#settingsDialog .close-dialog').click();
     expect(await page.locator('.schedule-wrap').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(255, 255, 255, 0.65)');
-    expect(await page.locator('.course-card:not(.inactive)').first().evaluate(n=>getComputedStyle(n).backgroundColor)).toMatch(/, 0\.9\)$/);
+    expect(await page.locator('.course-card:not(.inactive)').first().evaluate(n=>getComputedStyle(n).backgroundColor)).toMatch(/, 0\.85\)$/);
     expect(await page.locator('.course-card.inactive').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.55)');
     await page.screenshot({path:`test-results/wallpaper-${kind}-phone.png`,fullPage:true});
   }
 });
-test('八组课程配色与深色壁纸上的关键小字满足可读对比度',async({page})=>{
+test('马卡龙配色保持透明淡底，默认强遮罩下深色壁纸的正文清晰',async({page})=>{
   await fixture(page);
   const colors=await page.evaluate(()=>Array.from({length:8},(_,i)=>{
     const chip=document.createElement('span');chip.className='palette-'+i;document.body.append(chip);
@@ -89,42 +89,53 @@ test('八组课程配色与深色壁纸上的关键小字满足可读对比度',
   const rgb=value=>value.match(/[\d.]+/g).map(Number);
   const luminance=color=>rgb(color).slice(0,3).map(n=>{n/=255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
   const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-  for(const [fg,bg] of colors){
-    // Translucent course fills over the 65% glass surface and a black wallpaper.
-    const c=rgb(bg),composite='rgb('+c.slice(0,3).map(n=>n*c[3]+255*.65*(1-c[3])).join(',')+')';
-    expect(contrast(fg,composite),fg+' on '+composite).toBeGreaterThanOrEqual(4.5);
-  }
-  await page.locator('#settingsButton').click();await choose(page,'dark');await page.locator('#backgroundMask').fill('0');await page.locator('#backgroundMask').dispatchEvent('change');await page.locator('#settingsDialog .close-dialog').click();
+  colors.forEach(([,bg])=>expect(rgb(bg)[3]).toBe(.85));
+  expect(colors.slice(0,5).map(([fg])=>fg)).toEqual(['rgb(2, 132, 199)','rgb(22, 163, 74)','rgb(234, 88, 12)','rgb(219, 39, 119)','rgb(147, 51, 234)']);
+  await page.locator('#settingsButton').click();await choose(page,'dark');await expect(page.locator('#backgroundMask')).toHaveValue('80');await page.locator('#settingsDialog .close-dialog').click();
   const pairs=await page.evaluate(()=>['.day-head.today .date','.day-head:not(.today) .date','.time-label span','.masthead h1','.semester-name','.week-card .small','.schedule-hint','.quick-action'].map(selector=>{
-    const node=document.querySelector(selector);let background=[0,0,0];const ancestors=[];
+    const node=document.querySelector(selector);let background=[204,204,204];const ancestors=[];
     for(let n=node;n;n=n.parentElement)ancestors.unshift(n);
-    // Composite glass layers over black, the darkest possible wallpaper.
+    // Black wallpaper lightened by the default 80% white mask.
     for(const n of ancestors){if(n===document.body||n===document.documentElement)continue;const c=getComputedStyle(n).backgroundColor.match(/[\d.]+/g).map(Number),alpha=c[3]??1;background=background.map((v,i)=>c[i]*alpha+v*(1-alpha));}
     return [getComputedStyle(node).color,'rgb('+background.join(',')+')'];
   }));
   for(const [fg,bg] of pairs)expect(contrast(fg,bg),fg+' on '+bg).toBeGreaterThanOrEqual(4.5);
 });
-test('等宽数字与倒计时定宽，嵌套圆角匹配内距，课程与容器使用柔和阴影',async({page})=>{
+test('等宽数字与定宽倒计时保留，空白网格和课程没有独立圆框或强调条',async({page})=>{
   await fixture(page);
   const values=await page.evaluate(()=>{
     const css=selector=>getComputedStyle(document.querySelector(selector)),radius=selector=>parseFloat(css(selector).borderTopLeftRadius);
     return {
       numeric:['#nextCountdown','#weekSelect','.day-head .date','.time-label span'].map(s=>css(s).fontVariantNumeric),
-      radii:[['.quickbar','.add-button'],['.next-card','.countdown'],['.week-card','#todayButton'],['.grid-slot','.course-card']].map(([outer,inner])=>[radius(outer),radius(inner),parseFloat(css(outer).paddingTop)]),
+      radii:[['.quickbar','.add-button'],['.next-card','.countdown'],['.week-card','#todayButton']].map(([outer,inner])=>[radius(outer),radius(inner),parseFloat(css(outer).paddingTop)]),
       borders:['.next-card','.week-card','.quickbar','.schedule-wrap','.course-card:not(.inactive)'].map(s=>css(s).borderTopWidth),
-      shadows:['.next-card','.week-card','.quickbar','.schedule-wrap','.course-card:not(.inactive)'].map(s=>css(s).boxShadow),
+      slots:Array.from(document.querySelectorAll('.grid-slot'),n=>{const c=getComputedStyle(n);return [c.borderRadius,c.backgroundColor,c.boxShadow];}),
+      card:[css('.course-card:not(.inactive)').borderLeftWidth,css('.course-card:not(.inactive)').boxShadow,css('.course-card').justifyContent,radius('.course-card')],
       balance:['.course-card strong','#nextName'].map(s=>css(s).textWrap),
     };
   });
   values.numeric.forEach(n=>expect(n).toContain('tabular-nums'));
   values.radii.forEach(([outer,inner,inset])=>expect(outer).toBe(inner+inset));
-  values.borders.forEach(border=>expect(border).toBe('0px'));values.shadows.forEach(shadow=>expect(shadow).toContain('inset'));
+  values.borders.forEach(border=>expect(border).toBe('0px'));
+  values.slots.forEach(slot=>expect(slot).toEqual(['0px','rgba(0, 0, 0, 0)','none']));
+  expect(values.card).toEqual(['0px','none','flex-start',8]);
   values.balance.forEach(wrap=>expect(wrap).toContain('balance'));
   const box=await page.locator('#nextCountdown').boundingBox();
   for(const text of ['还有 11 小时 32 分','还有 1 分钟','还有 8 小时 08 分']){
     await page.locator('#nextCountdown').evaluate((n,text)=>n.textContent=text,text);
     const next=await page.locator('#nextCountdown').boundingBox();expect(next.x).toBe(box.x);expect(next.width).toBe(box.width);
   }
+});
+test('壁纸下标题和图例保持裸文字，今日淡色贯穿全列，旧遮罩值保留',async({page})=>{
+  await fixture(page);await page.locator('#settingsButton').click();await choose(page,'pattern');await page.locator('#settingsDialog .close-dialog').click();
+  for(const selector of ['.masthead','.section-heading','.schedule-legend','.schedule-hint','footer']) {
+    expect(await page.locator(selector).evaluate(n=>{const s=getComputedStyle(n);return [s.backgroundColor,s.boxShadow,s.backdropFilter];})).toEqual(['rgba(0, 0, 0, 0)','none','none']);
+  }
+  const highlight=page.locator('.today-column-highlight');await expect(highlight).toHaveCount(1);
+  const first=await page.locator('.time-label').first().boundingBox(),last=await page.locator('.time-label').last().boundingBox(),band=await highlight.boundingBox();
+  expect(band.y).toBe(first.y);expect(band.y+band.height).toBe(last.y+last.height);
+  await page.locator('#settingsButton').click();await page.locator('#backgroundMask').fill('35');await page.locator('#backgroundMask').dispatchEvent('change');await page.reload();
+  await page.locator('#settingsButton').click();await expect(page.locator('#backgroundMask')).toHaveValue('35');
 });
 test('首次加载和快速切周按日期错峰入场，减少动态效果时取消，课表数据保持不变',async({page})=>{
   await fixture(page);const before=await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'));

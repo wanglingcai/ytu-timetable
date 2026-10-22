@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const $=id=>document.getElementById(id),KEY='ytu-appearance-v1';
-  let config={mask:35,blur:0,imageUrl:''},saved={mask:35,blur:0},objectUrl='',busy=false,saveTimer;
+  let config={mask:80,blur:0,imageUrl:''},saved={mask:80,blur:0},objectUrl='',busy=false,saveTimer;
   const native=()=>window.AndroidLocal&&typeof AndroidLocal.readAppearance==='function';
   function report(message){if(window.receiveNativeError)window.receiveNativeError({message});else $('backgroundStatus').textContent=message;}
   function validate(value) {
@@ -74,7 +74,7 @@
     if(busy)return;clearTimeout(saveTimer);
     if(native()){AndroidLocal.clearBackground();return;}
     busy=true;apply();
-    try{await database('delete');config={mask:35,blur:0,imageUrl:''};setBlob(null);save();}catch(error){report(error.message);}finally{busy=false;apply();}
+    try{await database('delete');config={mask:80,blur:0,imageUrl:''};setBlob(null);save();}catch(error){report(error.message);}finally{busy=false;apply();}
   };
   ['backgroundMask','backgroundBlur'].forEach(id=>{
     $(id).oninput=()=>{config.mask=Number($('backgroundMask').value);config.blur=Number($('backgroundBlur').value);apply();clearTimeout(saveTimer);saveTimer=setTimeout(save,180);};

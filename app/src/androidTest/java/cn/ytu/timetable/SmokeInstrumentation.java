@@ -187,7 +187,7 @@ public final class SmokeInstrumentation extends Instrumentation {
         if(!oversizedRejected||!java.util.Arrays.equals(original,Files.readAllBytes(stored.toPath())))throw new AssertionError("Oversized image handling");
         checks++;report.append("✓ 超过 12 MB 的图片被拒绝，原背景保留\n");
         js("document.querySelector('#settingsButton').click();document.querySelector('#resetBackground').click();true");
-        await("!document.body.classList.contains('has-wallpaper') && document.querySelector('#backgroundMask').value==='35' && document.querySelector('#backgroundBlur').value==='0'");
+        await("!document.body.classList.contains('has-wallpaper') && document.querySelector('#backgroundMask').value==='80' && document.querySelector('#backgroundBlur').value==='0'");
         if(stored.exists())throw new AssertionError("Private background not removed");
         checks++;report.append("✓ 恢复默认删除私有图片并重置遮罩与模糊\n");
         check("AndroidLocal.readState()==="+timetable,"选图失败和恢复默认后课程与个人安排完整保留");

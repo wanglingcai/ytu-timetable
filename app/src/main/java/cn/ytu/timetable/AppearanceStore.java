@@ -17,7 +17,7 @@ final class AppearanceStore {
         synchronized(LOCK) {
             JSONObject data=new JSONObject();boolean exists=false;
             try(InputStream ignored=image(context).openRead()){exists=true;}catch(IOException ignored){}
-            try {data.put("mask",prefs(context).getInt("mask",35));data.put("blur",prefs(context).getInt("blur",0));
+            try {data.put("mask",prefs(context).getInt("mask",80));data.put("blur",prefs(context).getInt("blur",0));
                 data.put("imageUrl",exists?IMAGE_URL+"?v="+prefs(context).getLong("revision",0):"");
             }catch(Exception ignored){}
             return data;
@@ -37,7 +37,7 @@ final class AppearanceStore {
     static void clear(Context context) throws IOException {
         synchronized(LOCK) {
             image(context).delete();
-            if(!prefs(context).edit().putInt("mask",35).putInt("blur",0).commit())throw new IOException("外观设置保存失败");
+            if(!prefs(context).edit().putInt("mask",80).putInt("blur",0).commit())throw new IOException("外观设置保存失败");
         }
     }
     static void importImage(Context context,InputStream input) throws IOException {

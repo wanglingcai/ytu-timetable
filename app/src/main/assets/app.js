@@ -104,6 +104,8 @@
     const grid=$('scheduleGrid');grid.replaceChildren();grid.style.setProperty('--sections',state.times.length);
     const today=T.dateString(new Date());
     for(let d=0;d<=7;d++) {const head=el('div','day-head'+(d&&dates[d-1]===today?' today':''));head.style.gridColumn=d+1;head.style.gridRow=1;head.append(el('span','',d?['一','二','三','四','五','六','日'][d-1]:'节次'));if(d)head.append(el('span','date',dates[d-1].slice(5).replace('-','/')));grid.append(head);}
+    const todayIndex=dates.indexOf(today);
+    if(todayIndex>=0){const highlight=el('div','today-column-highlight');highlight.style.gridColumn=todayIndex+2;highlight.setAttribute('aria-hidden','true');grid.append(highlight);}
     for(let i=1;i<=state.times.length;i++) {
       const label=el('div','time-label');label.style.gridColumn=1;label.style.gridRow=i+1;append(label,el('b','',i),el('span','',state.times[i-1][0]),el('span','',state.times[i-1][1]));grid.append(label);
       for(let d=1;d<=7;d++) {
