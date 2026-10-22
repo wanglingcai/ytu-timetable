@@ -74,7 +74,7 @@ test('暗色、纯白与高对比壁纸下的文字衬底和玻璃界面',async(
     await page.locator('#backgroundMask').fill('0');await page.locator('#backgroundMask').dispatchEvent('change');
     await page.locator('#backgroundBlur').fill('0');await page.locator('#backgroundBlur').dispatchEvent('change');
     await page.locator('#settingsDialog .close-dialog').click();
-    expect(await page.locator('.schedule-wrap').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(255, 255, 255, 0.65)');
+    expect(await page.locator('.schedule-wrap').evaluate(n=>{const s=getComputedStyle(n);return [s.backgroundColor,s.backdropFilter,s.webkitBackdropFilter||'none'];})).toEqual(['rgba(0, 0, 0, 0)','none','none']);
     expect(await page.locator('.course-card:not(.inactive)').first().evaluate(n=>getComputedStyle(n).backgroundColor)).toMatch(/, 0\.85\)$/);
     expect(await page.locator('.course-card.inactive').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.55)');
     await page.screenshot({path:`test-results/wallpaper-${kind}-phone.png`,fullPage:true});

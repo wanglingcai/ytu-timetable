@@ -220,7 +220,7 @@ input:not([type=checkbox]),select:not(#weekSelect),textarea { background:#fff; b
 .has-wallpaper .week-card,.has-wallpaper .quickbar {
   background:rgba(255,255,255,.65); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
 }
-.has-wallpaper .schedule-wrap { background:rgba(255,255,255,.65); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.has-wallpaper .schedule-wrap { background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; }
 .has-wallpaper .grid-slot { border-color:rgba(0,0,0,.04); }
 .has-wallpaper .day-head,.has-wallpaper .time-label { background:rgba(255,255,255,.65); border-color:rgba(0,0,0,.04); }
 .has-wallpaper .day-head.today { background:rgba(255,255,255,.65); }
@@ -230,7 +230,6 @@ input:not([type=checkbox]),select:not(#weekSelect),textarea { background:#fff; b
 .nav-button { color:#405c74; }
 .has-wallpaper .list-card { background:rgba(255,255,255,.88); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
 .has-wallpaper dialog { background:rgba(255,255,255,.96); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
-@supports not (backdrop-filter:blur(1px)) { .has-wallpaper .schedule-wrap { background:rgba(255,255,255,.9); } }
 
 /* Retain shared control geometry; empty grid cells are flat continuous lines. */
 :root {
