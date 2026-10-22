@@ -6,9 +6,13 @@
   "scripts": {
     "test": "node --test tests/core.test.cjs",
     "fixtures": "node scripts/make-fixtures.cjs",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:visual": "playwright test tests/ui/visual-regression.spec.cjs",
+    "format": "prettier --write \"app/src/main/assets/**/*.{html,css,js}\"",
+    "format:check": "prettier --check \"app/src/main/assets/**/*.{html,css,js}\""
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2"
+    "@playwright/test": "1.58.2",
+    "prettier": "3.6.2"
   }
 }

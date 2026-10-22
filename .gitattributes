@@ -7,3 +7,14 @@ gradlew text eol=lf
 *.xls binary
 *.apk binary
 *.jar binary
+
+app/src/main/assets/*.js text eol=lf
+app/src/main/assets/**/*.js text eol=lf
+app/src/main/assets/*.css text eol=lf
+app/src/main/assets/**/*.css text eol=lf
+app/src/main/assets/*.html text eol=lf
+app/src/main/assets/**/*.html text eol=lf
+app/src/main/assets/vendor/** -text !eol
+.prettierrc.json text eol=lf
+.prettierignore text eol=lf
+tests/ui/visual-regression.spec.cjs text eol=lf

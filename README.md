@@ -8,7 +8,7 @@
 
 ## 安装与使用
 
-- 最新安装包：[deliverables/next-class-0.6.3-debug.apk](deliverables/next-class-0.6.3-debug.apk)，约 2.1 MB；同目录有 SHA-256 校验文件。使用相同包名和签名，可直接覆盖旧版，保留本地课表，不用先卸载。
+- 最新结构整理构建：[deliverables/next-class-0.6.3-refactor-debug.apk](deliverables/next-class-0.6.3-refactor-debug.apk)，约 1.3 MB；原 [0.6.3 安装包](deliverables/next-class-0.6.3-debug.apk) 保留。本轮仅整理代码，版本仍为 0.6.3 / versionCode 13，界面、功能与数据格式不变。使用相同包名和签名，可直接覆盖旧版，保留本地课表；同目录有 SHA-256 校验文件。
 - 手机要求：Android 8.0 及以上，使用较新版本的 Android System WebView / Chrome（建议 100 及以上）。开发侧安卓验证环境为 Android 15 模拟器；0.2.2 官网读取已获用户手机成功反馈，0.6.3 透明课表的新效果尚待实体手机试用。
 - 把 APK 发到手机并打开，按系统提示允许该文件管理器安装应用，安装后打开“下节啥课”。这是用于个人安装测试的 debug 签名包，未发布到应用商店。
 
@@ -151,10 +151,33 @@ CSV 示例（逗号分隔；周次字段包含逗号时需要双引号）：
 npm.cmd ci
 npm.cmd test
 npm.cmd run test:ui
+npm.cmd run test:visual
+npm.cmd run format:check
 node scripts/serve.cjs
 ```
 
 预览地址为 `http://127.0.0.1:4173`。浏览器测试使用本机 Microsoft Edge；其他系统可在 `playwright.config.cjs` 中调整浏览器配置。重新生成示例文件使用 `npm.cmd run fixtures`。
+
+自有前端 HTML、CSS、JavaScript 使用 Prettier 3.6.2 统一格式，执行 `npm.cmd run format` 可格式化；第三方 `vendor/` 不参与。`.gitattributes` 固定这些文件的 LF 换行，避免 Windows 检出后与格式检查冲突。Prettier 仅用于开发，不进入 APK。
+
+`test:ui` 包含视觉对照；`test:visual` 可单独运行 7 个视觉用例、13 张截图，覆盖 320/393/768px 首页、列表、详情、非本周、编辑器、短视口、设置、导入、透明壁纸、添加菜单和空态。基线在结构整理前用模拟数据、固定时间及 Windows Edge 生成，比较要求零差异。字体/浏览器/操作系统变更可能需要重新审核基线；不要为了消除失败直接更新图片。确认预期变化后才运行 `npm.cmd run test:visual -- --update-snapshots`。
+
+### 前端代码组织
+
+保持普通 `defer` 脚本按顺序加载，兼容安卓 `file:///android_asset/` 离线页面，不需要前端打包器。
+
+| 文件 | 职责 |
+| --- | --- |
+| `core.js` | 解析、数据校验、日期、冲突与布局计算；仍可由 Node 直接测试 |
+| `appearance.js` | 背景图片、遮罩与模糊的独立持久化 |
+| `ui.js` | DOM 小工具、提示、弹窗栈与安卓返回操作 |
+| `timetable-view.js` | 首页、网格、列表、下一节、时间线、文字适配及入场动效 |
+| `courses.js` | 课程/个人安排的详情、编辑、删除、重复周次及全部安排 |
+| `settings.js` | 学期/节次设置、提醒状态、权限入口和通知日期定位 |
+| `import.js` | 文件/官网读取结果、预览、确认导入、备份和示例入口 |
+| `app.js` | 统一持有课表和界面状态，负责保存及模块组装、周次导航和前台刷新 |
+
+各功能通过工厂参数接收状态、保存函数和操作回调；只有 `model.state` 经原有校验后保存，周次浏览、视图选择等界面状态不进入备份。原生回调名称保持不变。`style.css` 集中保留主题变量、组件、断点和壁纸状态规则，已清除历史覆盖声明与停用组件；后续应修改对应规则，避免继续在末尾堆叠补丁。安卓存储/提醒模块边界留待下一轮处理。
 
 Android 原生冒烟测试在**专用模拟器**安装主 APK 和测试 APK，然后运行自定义 Instrumentation；测试需要初始空数据，会导入模拟课程。完整命令与已验证结果见 [docs/VERIFICATION.md](docs/VERIFICATION.md)，不要对有真实课表数据的手机执行清空测试命令。
 
@@ -162,10 +185,11 @@ Android 原生冒烟测试在**专用模拟器**安装主 APK 和测试 APK，�
 
 ```text
 app/src/main/java/       原生文件选择、图片处理、私有存储、备份、提醒与 WebView 外壳
-app/src/main/assets/     界面、主题、外观持久化、解析与日历逻辑、随包 SheetJS 库
+app/src/main/assets/     入口、独立界面/导入/编辑/设置模块、主题、解析与日历逻辑
 app/src/androidTest/     原生 APK 冒烟测试
 examples/               标准模板和模拟 URP 文件
 tests/                  解析测试和手机尺寸浏览器测试
+tests/ui/*-snapshots/    模拟数据视觉对照基线（Windows Edge）
 scripts/                构建、示例生成与本地预览脚本
 deliverables/           可安装 APK、校验文件
 docs/                   验证记录、限制与界面预览

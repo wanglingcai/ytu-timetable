@@ -1,86 +1,365 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <meta name="theme-color" content="#f4f8ff">
-  <title>下节啥课 · 离线课程表</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="vendor/xlsx.full.min.js" defer></script>
-  <script src="core.js" defer></script>
-  <script src="appearance.js" defer></script>
-  <script src="app.js" defer></script>
-</head>
-<body>
-  <div id="wallpaper" class="wallpaper" aria-hidden="true" hidden><img id="wallpaperImage" alt=""><div class="wallpaper-mask"></div></div>
-  <main class="shell">
-    <header class="masthead">
-      <div class="brand"><span class="brand-mark" aria-hidden="true">课</span><div><h1>下节啥课</h1><p id="semesterLabel" class="semester-name">我的课表</p></div></div>
-      <div class="actions"><button id="importButton" class="button soft">导入</button><button id="settingsButton" class="icon-button" aria-label="学期与时间设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
-    </header>
-    <button id="nextCard" class="next-card" hidden>
-      <span class="next-main"><span class="next-top"><span id="nextLabel">接下来</span><span id="nextCountdown" class="countdown"></span></span><strong id="nextName"></strong><span id="nextMeta" class="next-meta"></span></span><span class="next-arrow" aria-hidden="true">↗</span>
-    </button>
-    <p id="reminderPermissionHint" class="notice" hidden>提醒尚未完整开启 · <button id="reminderSettingsButton" class="text-button">设置提醒 →</button></p><section class="week-card" aria-label="周次选择">
-      <div class="week-main"><button id="prevWeek" class="nav-button" aria-label="上一周">‹</button><div><label class="sr-only" for="weekSelect">选择周次</label><select id="weekSelect"></select><p id="weekRange" class="small"></p></div><button id="nextWeek" class="nav-button" aria-label="下一周">›</button></div>
-      <button id="todayButton" class="button soft">回到本周</button>
-    </section>
-    <p id="semesterNotice" class="notice" hidden></p>
-    <section id="emptyState" class="empty-state">
-      <div class="empty-art" aria-hidden="true"><div class="mini-calendar"><span></span><span></span><span></span><span></span><span></span><span></span></div><span class="sun">✦</span></div>
-      <div class="eyebrow">LESS NOISE. MORE CLARITY.</div><h2>课表在手，安排心里有数。</h2><p>导入一次，离线查看整个学期。<br>打开就能查看本周上课安排。</p>
-      <button id="emptyImport" class="button primary large">导入我的课表</button>
-      <div class="import-steps"><span><b>01</b>教务系统导出</span><span><b>02</b>校对导入结果</span><span><b>03</b>随时打开查看</span></div>
-      <p class="small">支持 Excel、CSV、HTML 和本应用 JSON 备份<br>导入后请核对周次和学期日期</p>
-      <button id="sampleButton" class="text-button">先体验示例课表 →</button>
-    </section>
-    <section id="scheduleSection" hidden>
-      <div class="section-heading"><h2 id="scheduleHeading">本周安排</h2><button id="viewToggle" class="text-button">切换列表</button></div>
-      <div class="schedule-legend"><span><i class="legend-active"></i>本周上课</span><span><i class="legend-inactive"></i><span id="inactiveCount">非本周</span></span></div>
-      <p id="conflictNotice" class="notice warning" hidden></p>
-      <div id="gridView" class="schedule-wrap"><div id="scheduleGrid" class="schedule-grid"></div></div>
-      <div id="listView" hidden></div>
-      <div id="noWeekCourses" class="quiet-card" hidden><span id="noWeekLabel">这一周还没有安排，点空白格试试。</span><button id="allCoursesButton" class="text-button">查看全部安排</button></div>
-      <p class="small schedule-hint">点击空白格添加个人安排 · 灰色为非本周课程</p>
-
-    </section>
-    <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.6.3</footer>
-  </main>
-  <nav class="quickbar" aria-label="课表操作"><button id="allButton" class="quick-action">全部安排</button><button id="addButton" class="add-button" aria-label="添加课程或个人安排"><span aria-hidden="true">＋</span> 添加</button><button id="backupButton" class="quick-action">导出备份</button></nav>
-  <dialog id="importChoice" class="bottom-sheet choice-sheet" aria-labelledby="importChoiceTitle">
-    <div class="sheet-handle" aria-hidden="true"></div><div class="dialog-head"><div><p class="eyebrow">把课程带进来</p><h2 id="importChoiceTitle">导入课表</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
-    <button id="portalImport" class="choice-option"><span class="choice-icon" aria-hidden="true">校</span><span><strong>烟台大学教务系统</strong><small>在官网登录，读取本学期课表 · 测试</small></span><span aria-hidden="true">›</span></button>
-    <button id="fileImport" class="choice-option"><span class="choice-icon" aria-hidden="true">文</span><span><strong>从文件或备份导入</strong><small>Excel、CSV、HTML、JSON 备份</small></span><span aria-hidden="true">›</span></button>
-    <p class="small">导入后会先预览，确认后才保存到本机。</p>
-  </dialog>
-  <dialog id="addChoice" class="bottom-sheet choice-sheet" aria-labelledby="addChoiceTitle">
-    <div class="sheet-handle" aria-hidden="true"></div><div class="dialog-head"><div><p class="eyebrow">给时间一个安排</p><h2 id="addChoiceTitle">添加到课表</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
-    <button id="addPersonalButton" class="choice-option"><span class="choice-icon" aria-hidden="true">＋</span><span><strong>个人安排</strong><small>自习、运动，或留给自己的时间</small></span><span aria-hidden="true">›</span></button>
-    <button id="addCourseButton" class="choice-option"><span class="choice-icon" aria-hidden="true">课</span><span><strong>添加课程</strong><small>手动补充课程、教师与教室</small></span><span aria-hidden="true">›</span></button>
-  </dialog>
-  <input id="backgroundInput" type="file" accept="image/*" hidden>
-  <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.html,.htm,.json" hidden>
-  <dialog id="importDialog"><div class="dialog-head"><div><p class="eyebrow">IMPORT PREVIEW</p><h2>确认你的课表</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><p id="importFileName" class="small wrap"></p><div id="importSummary" class="summary-row"></div><div id="importWarnings" class="notice warning" hidden></div><label>学期名称<input id="importSemester" maxlength="80" placeholder="例如：2026–2027 学年第一学期"></label><div class="field-row"><label>第一周周一<input id="importStart" type="date" required></label><label>学期总周数<input id="importWeeks" type="number" min="1" max="60" required></label></div><p id="importHint" class="small"></p><div class="confirm-row"><input id="reviewCheck" type="checkbox"><label for="reviewCheck">我已核对周次、日期和下方课程；知晓未识别的记录不会导入</label></div><div id="previewList" class="course-list"></div><div class="dialog-actions"><button id="cancelImport" class="button soft">取消</button><button id="saveImport" class="button primary">保存到手机</button></div></dialog>
-  <dialog id="settingsDialog"><div class="dialog-head"><div><p class="eyebrow">SEMESTER SETTINGS</p><h2>学期与时间</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><form id="settingsForm"><label>学期名称<input id="semesterInput" maxlength="80" required></label><div class="field-row"><label>第一周周一<input id="startInput" type="date" required></label><label>学期总周数<input id="weeksInput" type="number" min="1" max="60" required></label></div><p class="small">第一周周一决定“本周”的计算。开学日不是周一时，请填该周周一。</p><h3>自定义背景图</h3><div class="appearance-settings"><div class="appearance-actions"><button id="chooseBackground" type="button" class="button soft">从相册或图片文件选择</button><button id="resetBackground" type="button" class="button soft">恢复默认背景</button></div><label for="backgroundMask">白色遮罩 <output id="maskValue" for="backgroundMask">80%</output></label><input id="backgroundMask" type="range" min="0" max="80" step="1" value="80"><label for="backgroundBlur">背景模糊 <output id="blurValue" for="backgroundBlur">0px</output></label><input id="backgroundBlur" type="range" min="0" max="20" step="1" value="0"><p id="backgroundStatus" class="small" role="status"></p><p class="small">背景只保存在本机，不包含在课表 JSON 备份里。遮罩越高，图片越淡。</p></div><h3>提醒设置</h3><label>课程提醒<select id="courseReminder"><option value="-1">关闭</option><option value="0">准点提醒</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option></select></label><p class="small">课程统一使用此设置，个人安排在编辑时单独选择。保存设置后生效；按实际周次和节次时间提醒。</p><p id="reminderStatus" class="notice" role="status"></p><div class="time-actions"><button id="notificationPermission" type="button" class="button soft">开启通知</button><button id="exactReminderPermission" type="button" class="button soft">开启准时提醒</button></div><h3>节次时间</h3><p class="small">默认时间仅供参考，请按学校或校区实际作息核对。</p><div id="timeInputs"></div><div class="time-actions"><button id="addTimeButton" type="button" class="text-button">＋ 增加一节</button><button id="removeTimeButton" type="button" class="text-button">减少末节</button></div><div class="dialog-actions"><button type="button" id="clearButton" class="button danger">清空课表</button><button class="button primary" type="submit">保存设置</button></div></form><p class="small">数据只保存在本机，卸载或清除应用数据前请导出备份。应用不会自动获知学校调课。</p><p class="small">Excel 解析：SheetJS CE 0.20.3 · Apache-2.0</p></dialog>
-  <dialog id="courseDialog"><div class="dialog-head"><h2 id="courseDialogTitle">课程详情</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div><div id="courseDetail"></div></dialog>
-  <dialog id="editDialog" class="bottom-sheet editor-sheet" aria-labelledby="editTitle">
-    <div class="sheet-handle" aria-hidden="true"></div>
-    <div class="dialog-head"><h2 id="editTitle">添加课程</h2><button class="close-dialog icon-button" aria-label="关闭">×</button></div>
-    <p id="editContext" class="edit-context"></p>
-    <form id="courseForm"><div class="editor-fields">
-      <label><span id="entryNameLabel">课程名称</span><input id="courseName" maxlength="160" placeholder="这段时间，想做什么？" required></label>
-      <div class="field-row"><label><span id="entryRoomLabel">教室</span><input id="courseRoom" maxlength="300" placeholder="选填"></label><label id="courseTeacherField">教师<input id="courseTeacher" maxlength="160" placeholder="选填"></label></div>
-      <div class="field-row"><label>星期<select id="courseDay"><option value="1">星期一</option><option value="2">星期二</option><option value="3">星期三</option><option value="4">星期四</option><option value="5">星期五</option><option value="6">星期六</option><option value="7">星期日</option></select></label><label>节次<input id="courseSections" placeholder="例如 1-2" required></label></div>
-      <div class="repeat-field"><span id="entryWeeksLabel" class="field-label">上课周次</span><div class="repeat-controls" role="group" aria-labelledby="entryWeeksLabel"><button type="button" id="repeatOnce">仅本周</button><button type="button" id="repeatWeekly">每周</button><button type="button" id="repeatCustom">自定义</button></div></div>
-      <label id="customWeeksField" hidden>具体周次<input id="courseWeeks" placeholder="例如 1-18单周 或 3,8-10" required></label>
-      <div class="field-row"><label id="personalReminderField" hidden>提醒<select id="personalReminder"><option value="-1">不提醒</option><option value="0">准点提醒</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option></select></label></div>
-      <div id="notesField" hidden><details id="notesDetails"><summary>添加备注 <span class="small">选填</span></summary><label class="sr-only" for="entryNotes">备注</label><textarea id="entryNotes" maxlength="2000" rows="3" placeholder="例如：复习第三章，完成两道习题"></textarea></details></div>
-      <p class="small" id="editHint"></p>
-      </div><div class="dialog-actions"><button type="button" class="button soft" id="cancelEdit">取消</button><button type="submit" id="saveCourse" class="button primary">保存课程</button></div>
-    </form>
-  </dialog>
-  <dialog id="allDialog"><div class="dialog-head"><div><p class="eyebrow">ALL COURSES</p><h2>全部课程与安排</h2></div><button class="close-dialog icon-button" aria-label="关闭">×</button></div><p class="small">包含所有周次的课程和个人安排，点击查看、修改或删除。</p><div id="allList" class="course-list"></div></dialog>
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="theme-color" content="#f4f8ff" />
+    <title>下节啥课 · 离线课程表</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="vendor/xlsx.full.min.js" defer></script>
+    <script src="core.js" defer></script>
+    <script src="appearance.js" defer></script>
+    <script src="ui.js" defer></script>
+    <script src="timetable-view.js" defer></script>
+    <script src="courses.js" defer></script>
+    <script src="settings.js" defer></script>
+    <script src="import.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div id="wallpaper" class="wallpaper" aria-hidden="true" hidden>
+      <img id="wallpaperImage" alt="" />
+      <div class="wallpaper-mask"></div>
+    </div>
+    <main class="shell">
+      <header class="masthead">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">课</span>
+          <div>
+            <h1>下节啥课</h1>
+            <p id="semesterLabel" class="semester-name">我的课表</p>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="importButton" class="button soft">导入</button
+          ><button id="settingsButton" class="icon-button" aria-label="学期与时间设置">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
+      </header>
+      <button id="nextCard" class="next-card" hidden>
+        <span class="next-main"
+          ><span class="next-top"
+            ><span id="nextLabel">接下来</span
+            ><span id="nextCountdown" class="countdown"></span></span
+          ><strong id="nextName"></strong><span id="nextMeta" class="next-meta"></span></span
+        ><span class="next-arrow" aria-hidden="true">↗</span>
+      </button>
+      <p id="reminderPermissionHint" class="notice" hidden>
+        提醒尚未完整开启 ·
+        <button id="reminderSettingsButton" class="text-button">设置提醒 →</button>
+      </p>
+      <section class="week-card" aria-label="周次选择">
+        <div class="week-main">
+          <button id="prevWeek" class="nav-button" aria-label="上一周">‹</button>
+          <div>
+            <label class="sr-only" for="weekSelect">选择周次</label
+            ><select id="weekSelect"></select>
+            <p id="weekRange" class="small"></p>
+          </div>
+          <button id="nextWeek" class="nav-button" aria-label="下一周">›</button>
+        </div>
+        <button id="todayButton" class="button soft">回到本周</button>
+      </section>
+      <p id="semesterNotice" class="notice" hidden></p>
+      <section id="emptyState" class="empty-state">
+        <div class="empty-art" aria-hidden="true">
+          <div class="mini-calendar">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <span class="sun">✦</span>
+        </div>
+        <div class="eyebrow">LESS NOISE. MORE CLARITY.</div>
+        <h2>课表在手，安排心里有数。</h2>
+        <p>导入一次，离线查看整个学期。<br />打开就能查看本周上课安排。</p>
+        <button id="emptyImport" class="button primary large">导入我的课表</button>
+        <div class="import-steps">
+          <span><b>01</b>教务系统导出</span><span><b>02</b>校对导入结果</span
+          ><span><b>03</b>随时打开查看</span>
+        </div>
+        <p class="small">
+          支持 Excel、CSV、HTML 和本应用 JSON 备份<br />导入后请核对周次和学期日期
+        </p>
+        <button id="sampleButton" class="text-button">先体验示例课表 →</button>
+      </section>
+      <section id="scheduleSection" hidden>
+        <div class="section-heading">
+          <h2 id="scheduleHeading">本周安排</h2>
+          <button id="viewToggle" class="text-button">切换列表</button>
+        </div>
+        <div class="schedule-legend">
+          <span><i class="legend-active"></i>本周上课</span
+          ><span><i class="legend-inactive"></i><span id="inactiveCount">非本周</span></span>
+        </div>
+        <p id="conflictNotice" class="notice warning" hidden></p>
+        <div id="gridView" class="schedule-wrap">
+          <div id="scheduleGrid" class="schedule-grid"></div>
+        </div>
+        <div id="listView" hidden></div>
+        <div id="noWeekCourses" class="quiet-card" hidden>
+          <span id="noWeekLabel">这一周还没有安排，点空白格试试。</span
+          ><button id="allCoursesButton" class="text-button">查看全部安排</button>
+        </div>
+        <p class="small schedule-hint">点击空白格添加个人安排 · 灰色为非本周课程</p>
+      </section>
+      <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.6.3</footer>
+    </main>
+    <nav class="quickbar" aria-label="课表操作">
+      <button id="allButton" class="quick-action">全部安排</button
+      ><button id="addButton" class="add-button" aria-label="添加课程或个人安排">
+        <span aria-hidden="true">＋</span> 添加</button
+      ><button id="backupButton" class="quick-action">导出备份</button>
+    </nav>
+    <dialog id="importChoice" class="bottom-sheet choice-sheet" aria-labelledby="importChoiceTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">把课程带进来</p>
+          <h2 id="importChoiceTitle">导入课表</h2>
+        </div>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <button id="portalImport" class="choice-option">
+        <span class="choice-icon" aria-hidden="true">校</span
+        ><span
+          ><strong>烟台大学教务系统</strong><small>在官网登录，读取本学期课表 · 测试</small></span
+        ><span aria-hidden="true">›</span>
+      </button>
+      <button id="fileImport" class="choice-option">
+        <span class="choice-icon" aria-hidden="true">文</span
+        ><span><strong>从文件或备份导入</strong><small>Excel、CSV、HTML、JSON 备份</small></span
+        ><span aria-hidden="true">›</span>
+      </button>
+      <p class="small">导入后会先预览，确认后才保存到本机。</p>
+    </dialog>
+    <dialog id="addChoice" class="bottom-sheet choice-sheet" aria-labelledby="addChoiceTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">给时间一个安排</p>
+          <h2 id="addChoiceTitle">添加到课表</h2>
+        </div>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <button id="addPersonalButton" class="choice-option">
+        <span class="choice-icon" aria-hidden="true">＋</span
+        ><span><strong>个人安排</strong><small>自习、运动，或留给自己的时间</small></span
+        ><span aria-hidden="true">›</span>
+      </button>
+      <button id="addCourseButton" class="choice-option">
+        <span class="choice-icon" aria-hidden="true">课</span
+        ><span><strong>添加课程</strong><small>手动补充课程、教师与教室</small></span
+        ><span aria-hidden="true">›</span>
+      </button>
+    </dialog>
+    <input id="backgroundInput" type="file" accept="image/*" hidden />
+    <input id="fileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.html,.htm,.json" hidden />
+    <dialog id="importDialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">IMPORT PREVIEW</p>
+          <h2>确认你的课表</h2>
+        </div>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <p id="importFileName" class="small wrap"></p>
+      <div id="importSummary" class="summary-row"></div>
+      <div id="importWarnings" class="notice warning" hidden></div>
+      <label
+        >学期名称<input
+          id="importSemester"
+          maxlength="80"
+          placeholder="例如：2026–2027 学年第一学期"
+      /></label>
+      <div class="field-row">
+        <label>第一周周一<input id="importStart" type="date" required /></label
+        ><label>学期总周数<input id="importWeeks" type="number" min="1" max="60" required /></label>
+      </div>
+      <p id="importHint" class="small"></p>
+      <div class="confirm-row">
+        <input id="reviewCheck" type="checkbox" /><label for="reviewCheck"
+          >我已核对周次、日期和下方课程；知晓未识别的记录不会导入</label
+        >
+      </div>
+      <div id="previewList" class="course-list"></div>
+      <div class="dialog-actions">
+        <button id="cancelImport" class="button soft">取消</button
+        ><button id="saveImport" class="button primary">保存到手机</button>
+      </div>
+    </dialog>
+    <dialog id="settingsDialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">SEMESTER SETTINGS</p>
+          <h2>学期与时间</h2>
+        </div>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <form id="settingsForm">
+        <label>学期名称<input id="semesterInput" maxlength="80" required /></label>
+        <div class="field-row">
+          <label>第一周周一<input id="startInput" type="date" required /></label
+          ><label
+            >学期总周数<input id="weeksInput" type="number" min="1" max="60" required
+          /></label>
+        </div>
+        <p class="small">第一周周一决定“本周”的计算。开学日不是周一时，请填该周周一。</p>
+        <h3>自定义背景图</h3>
+        <div class="appearance-settings">
+          <div class="appearance-actions">
+            <button id="chooseBackground" type="button" class="button soft">
+              从相册或图片文件选择</button
+            ><button id="resetBackground" type="button" class="button soft">恢复默认背景</button>
+          </div>
+          <label for="backgroundMask"
+            >白色遮罩 <output id="maskValue" for="backgroundMask">80%</output></label
+          ><input id="backgroundMask" type="range" min="0" max="80" step="1" value="80" /><label
+            for="backgroundBlur"
+            >背景模糊 <output id="blurValue" for="backgroundBlur">0px</output></label
+          ><input id="backgroundBlur" type="range" min="0" max="20" step="1" value="0" />
+          <p id="backgroundStatus" class="small" role="status"></p>
+          <p class="small">背景只保存在本机，不包含在课表 JSON 备份里。遮罩越高，图片越淡。</p>
+        </div>
+        <h3>提醒设置</h3>
+        <label
+          >课程提醒<select id="courseReminder">
+            <option value="-1">关闭</option>
+            <option value="0">准点提醒</option>
+            <option value="5">提前 5 分钟</option>
+            <option value="10">提前 10 分钟</option>
+            <option value="15">提前 15 分钟</option>
+            <option value="30">提前 30 分钟</option>
+          </select></label
+        >
+        <p class="small">
+          课程统一使用此设置，个人安排在编辑时单独选择。保存设置后生效；按实际周次和节次时间提醒。
+        </p>
+        <p id="reminderStatus" class="notice" role="status"></p>
+        <div class="time-actions">
+          <button id="notificationPermission" type="button" class="button soft">开启通知</button
+          ><button id="exactReminderPermission" type="button" class="button soft">
+            开启准时提醒
+          </button>
+        </div>
+        <h3>节次时间</h3>
+        <p class="small">默认时间仅供参考，请按学校或校区实际作息核对。</p>
+        <div id="timeInputs"></div>
+        <div class="time-actions">
+          <button id="addTimeButton" type="button" class="text-button">＋ 增加一节</button
+          ><button id="removeTimeButton" type="button" class="text-button">减少末节</button>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" id="clearButton" class="button danger">清空课表</button
+          ><button class="button primary" type="submit">保存设置</button>
+        </div>
+      </form>
+      <p class="small">
+        数据只保存在本机，卸载或清除应用数据前请导出备份。应用不会自动获知学校调课。
+      </p>
+      <p class="small">Excel 解析：SheetJS CE 0.20.3 · Apache-2.0</p>
+    </dialog>
+    <dialog id="courseDialog">
+      <div class="dialog-head">
+        <h2 id="courseDialogTitle">课程详情</h2>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <div id="courseDetail"></div>
+    </dialog>
+    <dialog id="editDialog" class="bottom-sheet editor-sheet" aria-labelledby="editTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="dialog-head">
+        <h2 id="editTitle">添加课程</h2>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <p id="editContext" class="edit-context"></p>
+      <form id="courseForm">
+        <div class="editor-fields">
+          <label
+            ><span id="entryNameLabel">课程名称</span
+            ><input id="courseName" maxlength="160" placeholder="这段时间，想做什么？" required
+          /></label>
+          <div class="field-row">
+            <label
+              ><span id="entryRoomLabel">教室</span
+              ><input id="courseRoom" maxlength="300" placeholder="选填" /></label
+            ><label id="courseTeacherField"
+              >教师<input id="courseTeacher" maxlength="160" placeholder="选填"
+            /></label>
+          </div>
+          <div class="field-row">
+            <label
+              >星期<select id="courseDay">
+                <option value="1">星期一</option>
+                <option value="2">星期二</option>
+                <option value="3">星期三</option>
+                <option value="4">星期四</option>
+                <option value="5">星期五</option>
+                <option value="6">星期六</option>
+                <option value="7">星期日</option>
+              </select></label
+            ><label>节次<input id="courseSections" placeholder="例如 1-2" required /></label>
+          </div>
+          <div class="repeat-field">
+            <span id="entryWeeksLabel" class="field-label">上课周次</span>
+            <div class="repeat-controls" role="group" aria-labelledby="entryWeeksLabel">
+              <button type="button" id="repeatOnce">仅本周</button
+              ><button type="button" id="repeatWeekly">每周</button
+              ><button type="button" id="repeatCustom">自定义</button>
+            </div>
+          </div>
+          <label id="customWeeksField" hidden
+            >具体周次<input id="courseWeeks" placeholder="例如 1-18单周 或 3,8-10" required
+          /></label>
+          <div class="field-row">
+            <label id="personalReminderField" hidden
+              >提醒<select id="personalReminder">
+                <option value="-1">不提醒</option>
+                <option value="0">准点提醒</option>
+                <option value="5">提前 5 分钟</option>
+                <option value="10">提前 10 分钟</option>
+                <option value="15">提前 15 分钟</option>
+                <option value="30">提前 30 分钟</option>
+              </select></label
+            >
+          </div>
+          <div id="notesField" hidden>
+            <details id="notesDetails">
+              <summary>添加备注 <span class="small">选填</span></summary>
+              <label class="sr-only" for="entryNotes">备注</label
+              ><textarea
+                id="entryNotes"
+                maxlength="2000"
+                rows="3"
+                placeholder="例如：复习第三章，完成两道习题"
+              ></textarea>
+            </details>
+          </div>
+          <p class="small" id="editHint"></p>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="button soft" id="cancelEdit">取消</button
+          ><button type="submit" id="saveCourse" class="button primary">保存课程</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="allDialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ALL COURSES</p>
+          <h2>全部课程与安排</h2>
+        </div>
+        <button class="close-dialog icon-button" aria-label="关闭">×</button>
+      </div>
+      <p class="small">包含所有周次的课程和个人安排，点击查看、修改或删除。</p>
+      <div id="allList" class="course-list"></div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
 </html>

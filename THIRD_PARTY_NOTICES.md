@@ -15,4 +15,4 @@
 
 ## 构建和测试工具
 
-Gradle Wrapper 9.1.0 用于构建，分发包使用官方 SHA-256 校验。Android Gradle Plugin 9.0.1、Android SDK 与 Playwright 均只用于开发、构建或验证，不作为远程运行服务接入应用。对应许可和发布方条款分别适用。
+Gradle Wrapper 9.1.0 用于构建，分发包使用官方 SHA-256 校验。Android Gradle Plugin 9.0.1、Android SDK、Playwright 与 Prettier 3.6.2 均只用于开发、构建、验证或格式化，不作为远程运行服务接入应用。Prettier 使用 MIT 许可，不打包进入 APK。对应许可和发布方条款分别适用。
