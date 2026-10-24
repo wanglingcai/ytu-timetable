@@ -1,5 +1,13 @@
 plugins { id 'com.android.application' }
 
+import java.util.Properties
+
+def signingPropertiesFile = rootProject.file('keystore.properties')
+def signingProperties = new Properties()
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
 android {
     namespace 'cn.ytu.timetable'
     compileSdk 36
@@ -10,6 +18,24 @@ android {
         versionCode 13
         versionName '0.6.3'
         testInstrumentationRunner 'cn.ytu.timetable.SmokeInstrumentation'
+    }
+    signingConfigs {
+        release {
+            if (signingPropertiesFile.exists()) {
+                storeFile file(signingProperties['storeFile'])
+                storePassword signingProperties['storePassword']
+                keyAlias signingProperties['keyAlias']
+                keyPassword signingProperties['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signingPropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
