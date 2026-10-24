@@ -6,6 +6,9 @@ node_modules/
 test-results/
 *.jks
 *.keystore
+keystore.properties
+/dist/
+/deliverables/*.apk
 tmp/
 /选课结果.pdf
 /选课结果.html
