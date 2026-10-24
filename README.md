@@ -8,9 +8,16 @@
 
 ## 安装与使用
 
-- 最新结构整理构建：[deliverables/next-class-0.6.3-refactor-debug.apk](deliverables/next-class-0.6.3-refactor-debug.apk)，约 1.3 MB；原 [0.6.3 安装包](deliverables/next-class-0.6.3-debug.apk) 保留。本轮仅整理代码，版本仍为 0.6.3 / versionCode 13，界面、功能与数据格式不变。使用相同包名和签名，可直接覆盖旧版，保留本地课表；同目录有 SHA-256 校验文件。
+- 当前源码分支不再跟踪 APK；后续可从 [GitHub Releases](https://github.com/wanglingcai/ytu-timetable/releases) 下载带版本号的安装包和 SHA-256 校验文件。0.6.3 / versionCode 13 仍是上一版测试构建，下一正式版本会使用独立 release 签名。
 - 手机要求：Android 8.0 及以上，使用较新版本的 Android System WebView / Chrome（建议 100 及以上）。开发侧安卓验证环境为 Android 15 模拟器；0.2.2 官网读取已获用户手机成功反馈，0.6.3 透明课表的新效果尚待实体手机试用。
-- 把 APK 发到手机并打开，按系统提示允许该文件管理器安装应用，安装后打开“下节啥课”。这是用于个人安装测试的 debug 签名包，未发布到应用商店。
+- 下载 Release 中的 APK 后发到手机安装，按系统提示允许该文件管理器安装应用。校验文件中的 SHA-256 应与下载文件一致。
+
+### 构建产物、签名与升级
+
+- 构建脚本默认生成 debug APK 到被 Git 忽略的 `dist/`；发布构建使用 `scripts/build.ps1 -Release`，要求本机存在 `keystore.properties`。可复制 `keystore.properties.example` 后填写自己的签名文件路径和密码。
+- `keystore.properties`、`.jks` 和 `.keystore` 都不会提交到仓库。请把 release keystore 备份到安全位置；丢失后无法继续签发可覆盖升级的版本。
+- 每个正式版本使用一个 Git tag（例如 `v0.7.0`），Release 附件包含 APK 和 `SHA256SUMS.txt`。当前仓库历史中的 APK 已停止跟踪，旧文件仍可通过 Git 历史追溯。
+- 现有 v0.6.3 是 debug 签名包。切换独立 release 签名后，已安装旧包的用户需要先在应用内导出 JSON 课表备份，再卸载旧版并安装新版本，最后导入备份；后续 release 之间保持同一个 release keystore 即可直接覆盖升级。
 
 基本流程：
 
@@ -137,7 +144,7 @@ CSV 示例（逗号分隔；周次字段包含逗号时需要双引号）：
 .\scripts\build.ps1 -SdkPath '你的 Android SDK 目录' -JavaPath '你的 JDK 目录'
 ```
 
-脚本会配置本机 `local.properties`、执行构建与 Lint、根据 `app/build.gradle` 的版本号命名 APK，复制到 `deliverables/` 并为目录中的所有 APK 生成 SHA-256 校验文件。也可使用 `ANDROID_HOME` 指定 SDK，并直接运行：
+脚本会配置本机 `local.properties`、执行构建与 Lint、根据 `app/build.gradle` 的版本号命名 APK，复制到被 Git 忽略的 `dist/` 并为本次产物生成 SHA-256 校验文件。默认构建 debug 包；增加 `-Release` 后会读取本机 `keystore.properties` 并生成 release 包。也可使用 `ANDROID_HOME` 指定 SDK，并直接运行：
 
 ```powershell
 .\gradlew.bat :app:assembleDebug :app:lintDebug
@@ -191,7 +198,7 @@ examples/               标准模板和模拟 URP 文件
 tests/                  解析测试和手机尺寸浏览器测试
 tests/ui/*-snapshots/    模拟数据视觉对照基线（Windows Edge）
 scripts/                构建、示例生成与本地预览脚本
-deliverables/           可安装 APK、校验文件
+dist/                   本机构建输出的 APK、校验文件（被 Git 忽略）
 docs/                   验证记录、限制与界面预览
 ```
 
@@ -201,6 +208,6 @@ docs/                   验证记录、限制与界面预览
 - 暂不支持教务系统自动登录/后台同步、PDF/图片识别、桌面小组件或多学期切换；学校调课后需要重新读取官网或导入文件。提醒已在 Android 15 模拟器验证，实体手机和厂商省电策略下的准时性待验证。
 - 未安排周次/时间的课程不会显示到周视图；请按导入提示人工核对、必要时手动补充安排。课程名/地点较长时，手机周视图会截断，点击详情或切换列表可查看全文。
 - 旧版 WebView、加密或损坏的工作簿、非标准网格仍可能无法解析；没有“所有高校文件都兼容”的保证。
-- 当前 APK 为 debug 签名；后续覆盖安装需要使用相同签名。更换构建机器或签名、卸载重装前，请先备份。
+- v0.6.3 及更早 APK 为 debug 签名；下一正式版本切换独立 release 签名时，旧版用户需按上文导出备份、卸载、重装。后续 release 使用同一 keystore，才能保持覆盖升级。
 
 本次开发已同步维护本文档；测试覆盖和待验证事项均按实际结果标注。
