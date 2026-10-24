@@ -1,6 +1,6 @@
-plugins { id 'com.android.application' }
-
 import java.util.Properties
+
+plugins { id 'com.android.application' }
 
 def signingPropertiesFile = rootProject.file('keystore.properties')
 def signingProperties = new Properties()
