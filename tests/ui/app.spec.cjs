@@ -37,6 +37,16 @@ test('安卓尺寸：空态、文件预览、周次筛选、刷新后仍有课�
 test('二进制 XLS、HTML、CSV 均可通过真实文件选择导入',async({page})=>{
   for(const filename of ['模拟URP网格.xls','模拟URP网格.html','课程清单模板.csv']){await page.goto('/');await importAndSave(page,filename);await page.locator('#weekSelect').selectOption('3');await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(filename.endsWith('.csv')?4:3);}
 });
+test('再次导入时展示新增、删除和调整课程',async({page})=>{
+  await page.goto('/');await importAndSave(page,'课程清单模板.csv');
+  const csv='课程名称,星期,节次,周次,教师,教室\n示例计算机网络,星期二,1-2,1-17,示例教师,新六教306\n新增课程,星期三,3-4,1-16,新教师,新教室';
+  await page.locator('#fileInput').setInputFiles({name:'调课后.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await expect(page.locator('#importChanges')).toBeVisible();
+  await expect(page.locator('#importChanges')).toContainText('新增 1');
+  await expect(page.locator('#importChanges')).toContainText('删除 4');
+  await expect(page.locator('#importChanges')).toContainText('调整 1');
+  await expect(page.locator('#importChanges')).toContainText('新六教306');
+});
 test('设置校验、修改课程、备份恢复、失败导入不覆盖原数据',async({page})=>{
   await page.goto('/');await importAndSave(page);
   const before=await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'));

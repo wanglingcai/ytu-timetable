@@ -157,6 +157,67 @@
       URL.revokeObjectURL(url);
     }
   }
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+      reader.onerror = () => reject(new Error('背景图片读取失败'));
+      reader.readAsDataURL(blob);
+    });
+  }
+  function base64ToBlob(value) {
+    const binary = atob(value),
+      bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new Blob([bytes], { type: 'image/jpeg' });
+  }
+  async function exportBackup() {
+    if (native()) {
+      try {
+        const value = JSON.parse(AndroidLocal.exportAppearance());
+        if (
+          !value ||
+          !Number.isInteger(value.mask) ||
+          !Number.isInteger(value.blur) ||
+          typeof value.image !== 'string'
+        )
+          throw new Error();
+        return value;
+      } catch (error) {
+        throw new Error('外观设置读取失败');
+      }
+    }
+    const blob = await database('get');
+    return {
+      mask: config.mask,
+      blur: config.blur,
+      image: blob instanceof Blob ? await blobToBase64(blob) : ''
+    };
+  }
+  async function importBackup(value) {
+    if (
+      !value ||
+      !Number.isInteger(value.mask) ||
+      !Number.isInteger(value.blur) ||
+      typeof value.image !== 'string'
+    )
+      throw new Error('备份中的外观设置无效');
+    validate(value);
+    if (native()) {
+      AndroidLocal.importAppearance(JSON.stringify(value));
+      return;
+    }
+    if (value.image) {
+      const blob = base64ToBlob(value.image);
+      await database('put', blob);
+      setBlob(blob);
+    } else {
+      await database('delete');
+      setBlob(null);
+    }
+    config = { mask: value.mask, blur: value.blur, imageUrl: config.imageUrl };
+    save();
+    apply();
+  }
   $('chooseBackground').onclick = () => {
     if (native()) AndroidLocal.chooseBackground();
     else $('backgroundInput').click();
@@ -230,6 +291,7 @@
       report(error.message);
     }
   };
+  window.TimetableAppearance = { exportBackup, importBackup };
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) save();
   });

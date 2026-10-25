@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.*;
 import androidx.exifinterface.media.ExifInterface;
 import android.util.AtomicFile;
+import android.util.Base64;
 import org.json.JSONObject;
 import java.io.*;
 
@@ -21,6 +22,45 @@ final class AppearanceStore {
                 data.put("imageUrl",exists?IMAGE_URL+"?v="+prefs(context).getLong("revision",0):"");
             }catch(Exception ignored){}
             return data;
+        }
+    }
+    static JSONObject exportBackup(Context context) throws IOException {
+        synchronized(LOCK) {
+            JSONObject data=read(context);
+            data.remove("imageUrl");
+            String encoded="";
+            try(InputStream input=image(context).openRead()) {
+                ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+                byte[] buffer=new byte[8192];int size;
+                while((size=input.read(buffer))!=-1) {
+                    if(bytes.size()+size>12*1024*1024)throw new IOException("背景图片过大，无法备份");
+                    bytes.write(buffer,0,size);
+                }
+                encoded=Base64.encodeToString(bytes.toByteArray(),Base64.NO_WRAP);
+            }catch(FileNotFoundException missing){}
+            try {data.put("image",encoded);}catch(Exception invalid){throw new IOException("外观备份生成失败",invalid);}
+            return data;
+        }
+    }
+    static void importBackup(Context context,JSONObject value) throws IOException {
+        int mask=value.optInt("mask",-1),blur=value.optInt("blur",-1);
+        if(mask<0||mask>80||blur<0||blur>20)throw new IOException("备份中的外观设置无效");
+        String encoded=value.optString("image","");
+        if(encoded.length()>16*1024*1024)throw new IOException("备份中的背景图片过大");
+        if(encoded.isEmpty()) {
+            synchronized(LOCK) {
+                image(context).delete();
+                if(!prefs(context).edit().putInt("mask",mask).putInt("blur",blur).putLong("revision",prefs(context).getLong("revision",0)+1).commit())
+                    throw new IOException("外观设置保存失败");
+            }
+            return;
+        }
+        final byte[] bytes;
+        try {bytes=Base64.decode(encoded,Base64.DEFAULT);}catch(IllegalArgumentException invalid){throw new IOException("备份中的背景图片无效",invalid);}
+        if(bytes.length>12*1024*1024)throw new IOException("备份中的背景图片过大");
+        importImage(context,new ByteArrayInputStream(bytes));
+        synchronized(LOCK) {
+            if(!prefs(context).edit().putInt("mask",mask).putInt("blur",blur).commit())throw new IOException("外观设置保存失败");
         }
     }
     static boolean save(Context context,String json) {

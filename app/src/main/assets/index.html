@@ -109,13 +109,13 @@
         </div>
         <p class="small schedule-hint">点击空白格添加个人安排 · 灰色为非本周课程</p>
       </section>
-      <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.6.3</footer>
+      <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.8.0</footer>
     </main>
     <nav class="quickbar" aria-label="课表操作">
       <button id="allButton" class="quick-action">全部安排</button
       ><button id="addButton" class="add-button" aria-label="添加课程或个人安排">
         <span aria-hidden="true">＋</span> 添加</button
-      ><button id="backupButton" class="quick-action">导出备份</button>
+      ><button id="backupButton" class="quick-action">导出完整备份</button>
     </nav>
     <dialog id="importChoice" class="bottom-sheet choice-sheet" aria-labelledby="importChoiceTitle">
       <div class="sheet-handle" aria-hidden="true"></div>
@@ -134,7 +134,8 @@
       </button>
       <button id="fileImport" class="choice-option">
         <span class="choice-icon" aria-hidden="true">文</span
-        ><span><strong>从文件或备份导入</strong><small>Excel、CSV、HTML、JSON 备份</small></span
+        ><span
+          ><strong>从文件或备份导入</strong><small>Excel、CSV、HTML、完整 JSON 备份</small></span
         ><span aria-hidden="true">›</span>
       </button>
       <p class="small">导入后会先预览，确认后才保存到本机。</p>
@@ -172,6 +173,7 @@
       <p id="importFileName" class="small wrap"></p>
       <div id="importSummary" class="summary-row"></div>
       <div id="importWarnings" class="notice warning" hidden></div>
+      <div id="importChanges" class="notice import-changes" hidden></div>
       <label
         >学期名称<input
           id="importSemester"
@@ -245,8 +247,8 @@
         <div class="time-actions">
           <button id="notificationPermission" type="button" class="button soft">开启通知</button
           ><button id="exactReminderPermission" type="button" class="button soft">
-            开启准时提醒
-          </button>
+            开启准时提醒</button
+          ><button id="testReminderButton" type="button" class="button soft">发送测试提醒</button>
         </div>
         <h3>节次时间</h3>
         <p class="small">默认时间仅供参考，请按学校或校区实际作息核对。</p>

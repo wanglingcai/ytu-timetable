@@ -134,6 +134,25 @@ test('旧备份默认课程提前十分钟，提醒选项可备份且拒绝非�
   for(const minutes of [null,'10',undefined,2,60])assert.throws(()=>T.validateState({...old,reminders:{courseMinutes:minutes}}));
   for(const minutes of [null,'10',2,60])assert.throws(()=>makeCourse({kind:'personal',reminderMinutes:minutes}));
 });
+test('导入变化对比区分新增、删除和课程调整，忽略个人安排',()=>{
+  const before=[
+    makeCourse({id:'old-keep',name:'保留课程'}),
+    makeCourse({id:'old-room',name:'调整课程',room:'旧教室'}),
+    makeCourse({id:'old-remove',name:'删除课程'}),
+    makeCourse({id:'personal',name:'个人安排',kind:'personal'})
+  ];
+  const after=[
+    makeCourse({id:'new-keep',name:'保留课程'}),
+    makeCourse({id:'new-room',name:'调整课程',room:'新教室'}),
+    makeCourse({id:'new-add',name:'新增课程'})
+  ];
+  const diff=T.courseDiff(before,after);
+  assert.deepEqual(diff.added.map(c=>c.name),['新增课程']);
+  assert.deepEqual(diff.removed.map(c=>c.name),['删除课程']);
+  assert.equal(diff.changed.length,1);
+  assert.equal(diff.changed[0].before.room,'旧教室');
+  assert.equal(diff.changed[0].after.room,'新教室');
+});
 test('相邻冲突链课程不会互相遮住，三门连续交叠使用稳定的两列',()=>{
   const a=makeCourse({start:1,end:2}),b=makeCourse({start:2,end:3}),c=makeCourse({start:3,end:4}),d=makeCourse({start:5,end:6});
   const positions=T.layoutCourses([a,b,c,d]);

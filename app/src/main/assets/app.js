@@ -82,7 +82,14 @@
     courseRow: (...args) => view.courseRow(...args),
     reminderLabel: settings.reminderLabel
   });
-  const imports = factories.createImport({ T, ui, model, persist, render });
+  const imports = factories.createImport({
+    T,
+    ui,
+    model,
+    persist,
+    render,
+    appearance: window.TimetableAppearance
+  });
   window.refreshReminderStatus = settings.refreshReminderStatus;
   window.openReminder = settings.openReminder;
   window.receiveImport = imports.receiveImport;

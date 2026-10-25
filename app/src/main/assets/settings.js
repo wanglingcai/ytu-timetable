@@ -112,6 +112,10 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
     $('reminderSettingsButton').onclick = openSettings;
     $('notificationPermission').onclick = () => AndroidLocal.reminderPermission('notifications');
     $('exactReminderPermission').onclick = () => AndroidLocal.reminderPermission('exact');
+    $('testReminderButton').hidden = !(
+      window.AndroidLocal && typeof AndroidLocal.testReminder === 'function'
+    );
+    $('testReminderButton').onclick = () => AndroidLocal.testReminder();
     $('settingsForm').onsubmit = (event) => {
       event.preventDefault();
       if (
@@ -163,5 +167,6 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
       if (persist({ ...model.state, courses: [], sourceName: '' }, '课表已清空')) closeAll();
     };
   }
+  window.receiveReminderTest = (payload) => toast(payload.message || '测试提醒已发送');
   return { openSettings, reminderLabel, refreshReminderStatus, openReminder, bindEvents };
 };

@@ -202,6 +202,16 @@ h3 {
   background: #fff1d5;
   color: #795c22;
 }
+.import-changes {
+  background: #edf5ff;
+  color: #315b83;
+}
+.change-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.7;
+}
 .empty-state {
   text-align: center;
   padding: 52px 12px 20px;

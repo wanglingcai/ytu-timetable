@@ -112,6 +112,15 @@ final class ReminderScheduler {
             .setCategory(Notification.CATEGORY_EVENT).setVisibility(Notification.VISIBILITY_PRIVATE).setWhen(item.start).build();
         try {context.getSystemService(NotificationManager.class).notify(item.tag(),0,notification);}catch(SecurityException denied){ /* permission revoked */ }
     }
+    static void test(Context context) throws Exception {
+        if(!notificationsAllowed(context))throw new IOException("请先开启通知权限和通知频道");
+        Intent intent=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent open=PendingIntent.getActivity(context,1,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification notification=new Notification.Builder(context,CHANNEL).setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("提醒测试成功").setContentText("下节啥课可以正常发送通知").setContentIntent(open)
+            .setAutoCancel(true).setCategory(Notification.CATEGORY_EVENT).setVisibility(Notification.VISIBILITY_PRIVATE).build();
+        context.getSystemService(NotificationManager.class).notify("test-reminder",1,notification);
+    }
     static String status(Context context) {
         synchronized(LOCK) {
             JSONObject status=new JSONObject();

@@ -29,6 +29,7 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends Activity {
     private static final int PICK_FILE = 100, SAVE_BACKUP = 101, IMPORT_PORTAL = 102, PICK_BACKGROUND=104;
     private static final int MAX_IMPORT_BYTES = 12 * 1024 * 1024;
+    private static final int MAX_BACKUP_BYTES = 16 * 1024 * 1024;
     private static final int MAX_STATE_BYTES = 4 * 1024 * 1024;
     private WebView web;
     private AtomicFile stateFile;
@@ -137,6 +138,16 @@ public final class MainActivity extends Activity {
 
     public final class LocalBridge {
         @JavascriptInterface public String readAppearance(){return AppearanceStore.read(MainActivity.this).toString();}
+        @JavascriptInterface public String exportAppearance(){
+            try{return AppearanceStore.exportBackup(MainActivity.this).toString();}
+            catch(Exception failed){return "{}";}
+        }
+        @JavascriptInterface public void importAppearance(String json){
+            worker.execute(()->{
+                try {AppearanceStore.importBackup(MainActivity.this,new JSONObject(json));event("receiveAppearance",AppearanceStore.read(MainActivity.this));}
+                catch(Exception failed){error(failed.getMessage()==null?"外观设置恢复失败。":failed.getMessage());}
+            });
+        }
         @JavascriptInterface public boolean saveAppearance(String json){return AppearanceStore.save(MainActivity.this,json);}
         @JavascriptInterface public void chooseBackground() {
             runOnUiThread(()->{try{startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE),PICK_BACKGROUND);}catch(Exception failed){error("无法打开系统图片选择器。");}});
@@ -145,6 +156,12 @@ public final class MainActivity extends Activity {
             worker.execute(()->{try{AppearanceStore.clear(MainActivity.this);event("receiveAppearance",AppearanceStore.read(MainActivity.this));}catch(Exception failed){error("恢复默认背景失败，请重试。");}});
         }
         @JavascriptInterface public String reminderStatus() {return ReminderScheduler.status(MainActivity.this);}
+        @JavascriptInterface public void testReminder() {
+            worker.execute(()->{
+                try {ReminderScheduler.test(MainActivity.this);event("receiveReminderTest",new JSONObject().put("message","测试提醒已发送，请查看通知栏。"));}
+                catch(Exception failed){error(failed.getMessage()==null?"测试提醒发送失败。":failed.getMessage());}
+            });
+        }
         @JavascriptInterface public void reminderPermission(String kind) {
             runOnUiThread(()->{
                 try {
@@ -195,7 +212,7 @@ public final class MainActivity extends Activity {
         }
 
         @JavascriptInterface public void exportBackup(String json) {
-            if (json == null || json.getBytes(StandardCharsets.UTF_8).length > MAX_STATE_BYTES) { error("备份数据超出大小限制。"); return; }
+            if (json == null || json.getBytes(StandardCharsets.UTF_8).length > MAX_BACKUP_BYTES) { error("备份数据超出大小限制。"); return; }
             pendingBackup = json;
             runOnUiThread(() -> {
                 Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE);
@@ -248,9 +265,10 @@ public final class MainActivity extends Activity {
                 }
                 JSONObject payload = new JSONObject();
                 payload.put("name", name);
-                payload.put("data", Base64.encodeToString(readBounded(input, MAX_IMPORT_BYTES), Base64.NO_WRAP));
+                int limit=name.toLowerCase(java.util.Locale.ROOT).endsWith(".json")?MAX_BACKUP_BYTES:MAX_IMPORT_BYTES;
+                payload.put("data", Base64.encodeToString(readBounded(input, limit), Base64.NO_WRAP));
                 event("receiveImport", payload);
-            } catch (Exception failed) { error("读取文件失败。请选择可访问且不超过 12 MB 的课表文件。"); }
+            } catch (Exception failed) { error("读取文件失败。普通课表文件不能超过 12 MB，完整 JSON 备份不能超过 16 MB。"); }
         });
         if (request == SAVE_BACKUP) {
             final String snapshot = pendingBackup;

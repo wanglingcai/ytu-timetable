@@ -7,7 +7,9 @@
   'use strict';
   const MAX_WEEKS = 60,
     MAX_COURSES = 1000,
-    MAX_SECTIONS = 16;
+    MAX_SECTIONS = 16,
+    MAX_IMPORT_BYTES = 12 * 1024 * 1024,
+    MAX_BACKUP_BYTES = 16 * 1024 * 1024;
   const DEFAULT_TIMES = [
     ['08:00', '08:45'],
     ['08:55', '09:40'],
@@ -432,8 +434,10 @@
   }
 
   function readImport(bytes, name, XLSX) {
-    if (!bytes || bytes.length > 12 * 1024 * 1024) throw new Error('文件不能超过 12 MB');
     const ext = text(name).toLowerCase().split('.').pop();
+    const limit = ext === 'json' ? MAX_BACKUP_BYTES : MAX_IMPORT_BYTES;
+    if (!bytes || bytes.length > limit)
+      throw new Error(ext === 'json' ? '备份文件不能超过 16 MB' : '文件不能超过 12 MB');
     if (!['json', 'xlsx', 'xls', 'csv', 'tsv', 'html', 'htm'].includes(ext))
       throw new Error('请选择 Excel、CSV、HTML 或 JSON 文件');
     const decode = () => {
@@ -444,9 +448,16 @@
       }
     };
     if (ext === 'json') {
-      const restored = validateState(JSON.parse(decode()));
+      const raw = JSON.parse(decode());
+      const restored = validateState(raw);
       if (!restored.courses.length) throw new Error('该备份中没有课程');
-      return { courses: restored.courses, warnings: [], format: '本应用备份', restore: restored };
+      return {
+        courses: restored.courses,
+        warnings: [],
+        format: raw.appearance ? '完整本应用备份' : '本应用备份',
+        restore: restored,
+        appearance: raw.appearance
+      };
     }
     const head = new TextDecoder().decode(bytes.slice(0, 200));
     const isText = ['csv', 'tsv', 'html', 'htm'].includes(ext) || /^\s*(?:\uFEFF)?</.test(head);
@@ -584,6 +595,46 @@
       savedAt: text(raw.savedAt).slice(0, 40)
     };
   }
+  function courseDiffKey(course) {
+    return JSON.stringify([
+      text(course.name),
+      text(course.teacher),
+      course.day,
+      course.start,
+      course.end
+    ]);
+  }
+  function courseExactKey(course) {
+    return JSON.stringify([
+      text(course.name),
+      text(course.teacher),
+      text(course.room),
+      course.day,
+      course.start,
+      course.end,
+      course.weeks
+    ]);
+  }
+  function courseDiff(previous, incoming) {
+    const before = (previous || []).filter((course) => course.kind !== 'personal');
+    const after = (incoming || []).filter((course) => course.kind !== 'personal');
+    const oldRemaining = before.slice();
+    const added = [],
+      changed = [];
+    for (const course of after) {
+      const exact = oldRemaining.findIndex(
+        (item) => courseExactKey(item) === courseExactKey(course)
+      );
+      if (exact >= 0) {
+        oldRemaining.splice(exact, 1);
+        continue;
+      }
+      const match = oldRemaining.findIndex((item) => courseDiffKey(item) === courseDiffKey(course));
+      if (match >= 0) changed.push({ before: oldRemaining.splice(match, 1)[0], after: course });
+      else added.push(course);
+    }
+    return { added, removed: oldRemaining, changed };
+  }
   function findConflicts(courses) {
     const results = [];
     for (let i = 0; i < courses.length; i++)
@@ -718,6 +769,8 @@
     MAX_WEEKS,
     MAX_COURSES,
     MAX_SECTIONS,
+    MAX_IMPORT_BYTES,
+    MAX_BACKUP_BYTES,
     DEFAULT_TIMES,
     text,
     uid,
@@ -737,6 +790,7 @@
     weekDates,
     defaultState,
     validateState,
+    courseDiff,
     findConflicts,
     coursesInWeek,
     coursesForWeekView,

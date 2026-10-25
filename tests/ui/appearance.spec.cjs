@@ -61,7 +61,7 @@ test('图片、遮罩与模糊本地持久化；损坏图片保留原背景，�
   expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(before);
   await page.locator('#settingsDialog .close-dialog').click();const download=page.waitForEvent('download');await page.locator('#backupButton').click();
   const file=await(await download).createReadStream();let json='';for await(const chunk of file)json+=chunk;
-  expect(JSON.parse(json).courses).toHaveLength(6);expect(json).not.toMatch(/imageUrl|wallpaper|background\.jpg|blob:/);
+  const saved=JSON.parse(json);expect(saved.courses).toHaveLength(6);expect(saved.appearance.mask).toBe(80);expect(saved.appearance.blur).toBe(20);expect(saved.appearance.image.length).toBeGreaterThan(100);expect(json).not.toMatch(/imageUrl|wallpaper|background\.jpg|blob:/);
   await page.locator('#settingsButton').click();await page.locator('#resetBackground').click();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);
   await expect(page.locator('#backgroundMask')).toHaveValue('80');await expect(page.locator('#backgroundBlur')).toHaveValue('0');
   await page.reload();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);

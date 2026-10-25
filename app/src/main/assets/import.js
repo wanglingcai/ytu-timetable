@@ -1,19 +1,27 @@
 'use strict';
 // Classic script factories also work from Android's offline file URL.
-window.TimetableApp.createImport = function ({ T, ui, model, persist, render }) {
+window.TimetableApp.createImport = function ({ T, ui, model, persist, render, appearance }) {
   const { $, DAY, el, append, toast, showDialog, closeDialog } = ui;
-  const MAX_BYTES = 12 * 1024 * 1024;
+  const MAX_BYTES = T.MAX_IMPORT_BYTES;
+  const MAX_BACKUP_BYTES = T.MAX_BACKUP_BYTES;
   let preview = null;
-  function backup() {
-    const json = JSON.stringify(model.state, null, 2);
-    if (window.AndroidLocal) AndroidLocal.exportBackup(json);
-    else {
-      const a = el('a');
-      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-      a.href = url;
-      a.download = '下节啥课-备份.json';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+  async function backup() {
+    try {
+      const payload = { ...model.state };
+      if (appearance && typeof appearance.exportBackup === 'function')
+        payload.appearance = await appearance.exportBackup();
+      const json = JSON.stringify(payload, null, 2);
+      if (window.AndroidLocal) AndroidLocal.exportBackup(json);
+      else {
+        const a = el('a');
+        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        a.href = url;
+        a.download = '下节啥课-完整备份.json';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (error) {
+      toast(error.message || '备份读取失败');
     }
   }
   function chooseFile() {
@@ -21,8 +29,9 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render }) 
     else $('fileInput').click();
   }
   async function receiveBytes(name, bytes) {
-    if (bytes.length > MAX_BYTES) {
-      toast('文件不能超过 12 MB');
+    const isBackup = /\.json$/i.test(name);
+    if (bytes.length > (isBackup ? MAX_BACKUP_BYTES : MAX_BYTES)) {
+      toast(isBackup ? '备份文件不能超过 16 MB' : '文件不能超过 12 MB');
       return;
     }
     toast('正在本机解析课表…');
@@ -62,6 +71,7 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render }) 
       (preview.warnings.length > 60
         ? '\n还有 ' + (preview.warnings.length - 60) + ' 条提示，请核对原文件。'
         : '');
+    renderChanges();
     const base = preview.restore || model.state;
     $('importSemester').value = preview.restore
       ? base.semester
@@ -92,7 +102,65 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render }) 
     $('toast').hidden = true;
     showDialog('importDialog');
   }
-  function importSave() {
+  function changeCourseLabel(course) {
+    return (
+      course.name +
+      ' · ' +
+      DAY[course.day] +
+      ' 第' +
+      course.start +
+      '–' +
+      course.end +
+      '节 · ' +
+      (course.room || '地点待定')
+    );
+  }
+  function renderChanges() {
+    const box = $('importChanges');
+    if (!box) return;
+    const diff = T.courseDiff(model.state.courses, preview.courses);
+    if (preview.restore || !model.state.courses.some((course) => course.kind !== 'personal')) {
+      box.hidden = true;
+      box.replaceChildren();
+      return;
+    }
+    const total = diff.added.length + diff.removed.length + diff.changed.length;
+    box.hidden = false;
+    box.replaceChildren();
+    box.append(el('strong', '', total ? '与当前课表相比' : '导入变化检查'));
+    if (!total) {
+      box.append(document.createTextNode('：没有检测到学校课程变化。'));
+      return;
+    }
+    box.append(
+      document.createTextNode(
+        '：新增 ' +
+          diff.added.length +
+          '，删除 ' +
+          diff.removed.length +
+          '，调整 ' +
+          diff.changed.length +
+          '。'
+      )
+    );
+    const list = el('ul', 'change-list');
+    diff.added
+      .slice(0, 20)
+      .forEach((course) => list.append(el('li', '', '新增：' + changeCourseLabel(course))));
+    diff.removed
+      .slice(0, 20)
+      .forEach((course) => list.append(el('li', '', '删除：' + changeCourseLabel(course))));
+    diff.changed
+      .slice(0, 20)
+      .forEach(({ before, after }) =>
+        list.append(
+          el('li', '', '调整：' + changeCourseLabel(before) + ' → ' + changeCourseLabel(after))
+        )
+      );
+    if (total > 60) list.append(el('li', '', '其余变化请导入后在列表中核对。'));
+    box.append(list);
+  }
+  async function importSave() {
     if (!preview) return;
     if (!$('reviewCheck').checked) {
       toast('请先核对课程，并勾选确认后保存');
@@ -129,6 +197,13 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render }) 
       sourceName: preview.name
     };
     if (persist(next, '课表已保存，之后可直接离线查看')) {
+      if (preview.appearance && appearance && typeof appearance.importBackup === 'function') {
+        try {
+          await appearance.importBackup(preview.appearance);
+        } catch (error) {
+          toast(error.message || '外观设置恢复失败，课表已保存');
+        }
+      }
       model.week = Math.max(
         1,
         Math.min(model.state.totalWeeks, T.currentWeek(model.state.startDate))
@@ -205,8 +280,9 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render }) 
       const file = event.target.files[0];
       event.target.value = '';
       if (!file) return;
-      if (file.size > MAX_BYTES) {
-        toast('文件不能超过 12 MB');
+      const isBackup = /\.json$/i.test(file.name);
+      if (file.size > (isBackup ? MAX_BACKUP_BYTES : MAX_BYTES)) {
+        toast(isBackup ? '备份文件不能超过 16 MB' : '文件不能超过 12 MB');
         return;
       }
       receiveBytes(file.name, new Uint8Array(await file.arrayBuffer()));
