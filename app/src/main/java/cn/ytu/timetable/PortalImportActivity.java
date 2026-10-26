@@ -108,7 +108,7 @@ public final class PortalImportActivity extends Activity {
         status.setTextSize(12);
         int padding = (int)(10 * getResources().getDisplayMetrics().density);
         status.setPadding(padding,padding/2,padding,padding/2);
-        status.setText("请先完成统一身份认证，再在办事服务大厅进入「本科教务系统」；关闭窗口后清理应用内登录会话。");
+        status.setText("请先连接校园网或学校 VPN，再完成统一身份认证；随后在办事服务大厅进入「本科教务系统」。关闭窗口后清理应用内登录会话。");
         root.addView(status);
         portal = new WebView(this);
         WebSettings settings = portal.getSettings();
@@ -153,7 +153,7 @@ public final class PortalImportActivity extends Activity {
                         : "请先完成统一身份认证，再进入本科教务系统。"));
             }
             @Override public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
-                if (request.isForMainFrame()) status.setText("学校登录页面加载失败，请检查网络或更新 Android System WebView。");
+                if (request.isForMainFrame()) status.setText("学校登录页面加载失败，请连接校园网或学校 VPN，并更新 Android System WebView。");
             }
         });
         portal.setDownloadListener((url,agent,disposition,mime,length) -> message("无需导出 PDF，请点击上方「读取课表」。"));
@@ -270,7 +270,9 @@ public final class PortalImportActivity extends Activity {
 
     private void readError(String text, String code) {
         status.setText("课表未导入，请按提示重试。");
-        new AlertDialog.Builder(this).setTitle("读取课表未完成").setMessage(text+"\n原课表未修改。（"+code+"）")
+        String networkHint=(code.startsWith("API_")||"TIMEOUT".equals(code))
+            ? "\n请确认当前已连接校园网或学校 VPN。" : "";
+        new AlertDialog.Builder(this).setTitle("读取课表未完成").setMessage(text+networkHint+"\n原课表未修改。（"+code+"）")
             .setPositiveButton("确定",null).setNeutralButton("刷新页面",(dialog,which)->portal.reload()).show();
     }
 
