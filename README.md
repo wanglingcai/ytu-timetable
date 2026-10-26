@@ -4,11 +4,11 @@
 
 原名“烟大随课”，从 0.1.2 起更名为“下节啥课”，适用于使用受支持课表格式的不同学校。包名、存储结构与备份格式保持兼容，旧版课表和 JSON 备份可以继续使用。
 
-> **当前源码版本为 0.8.1 / versionCode 16。** 在 0.7.0 的正式签名和 Releases 分发基础上，增加导入变化对比、完整备份和安卓测试提醒，并修复烟台大学统一认证跳转兼容性；保留自定义背景、淡彩课程、连续细网格、下一节倒计时、个人安排、安卓到点通知、文件导入和烟台大学 URP 官网读取。当前 APK 不能直接导入 PDF。本应用为个人项目，非学校官方应用。
+> **当前源码版本为 0.8.2 / versionCode 17。** 在 0.7.0 的正式签名和 Releases 分发基础上，增加导入变化对比、完整备份和安卓测试提醒，并修复烟台大学统一认证与办事服务大厅跳转；保留自定义背景、淡彩课程、连续细网格、下一节倒计时、个人安排、安卓到点通知、文件导入和烟台大学 URP 官网读取。当前 APK 不能直接导入 PDF。本应用为个人项目，非学校官方应用。
 
 ## 安装与使用
 
-- 当前源码分支不再跟踪 APK；正式包会从 [GitHub Releases](https://github.com/wanglingcai/ytu-timetable/releases) 下载，并附带 SHA-256 校验文件。0.8.1 / versionCode 16 继续使用同一个 release keystore。
+- 当前源码分支不再跟踪 APK；正式包会从 [GitHub Releases](https://github.com/wanglingcai/ytu-timetable/releases) 下载，并附带 SHA-256 校验文件。0.8.2 / versionCode 17 继续使用同一个 release keystore。
 - 手机要求：Android 8.0 及以上，使用较新版本的 Android System WebView / Chrome（建议 100 及以上）。开发侧安卓验证环境为 Android 15 模拟器；0.2.2 官网读取已获用户手机成功反馈，0.6.3 透明课表的新效果尚待实体手机试用。
 - 下载 Release 中的 APK 后发到手机安装，按系统提示允许该文件管理器安装应用。校验文件中的 SHA-256 应与下载文件一致。
 

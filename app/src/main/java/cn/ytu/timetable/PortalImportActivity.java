@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 
 /** Official-site browser, deliberately without the local storage JavaScript bridge. */
 public final class PortalImportActivity extends Activity {
+    static final String ENTRY_URL = "https://cas.ytu.edu.cn/lyuapServer/login?service=https%3A%2F%2Fehall.ytu.edu.cn%3A4106%2F";
     static final String RESULT_URL = "https://jwxs.ytu.edu.cn/student/courseSelect/courseSelectResult/index";
     static final String DATA_URL = "https://jwxs.ytu.edu.cn/student/courseSelect/thisSemesterCurriculum/callback";
     static final int MAX_RESULT_BYTES = 240 * 1024;
@@ -55,8 +56,10 @@ public final class PortalImportActivity extends Activity {
         boolean schoolHost=host!=null && ("jwxs.ytu.edu.cn".equalsIgnoreCase(host)
             || "cas.ytu.edu.cn".equalsIgnoreCase(host)
             || host.toLowerCase(java.util.Locale.ROOT).endsWith(".ytu.edu.cn"));
+        boolean portAllowed=(uri.getPort()==-1 || uri.getPort()==443)
+            || ("ehall.ytu.edu.cn".equalsIgnoreCase(host) && uri.getPort()==4106);
         return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null
-            && (uri.getPort() == -1 || uri.getPort() == 443)
+            && portAllowed
             && schoolHost;
     }
 
@@ -105,7 +108,7 @@ public final class PortalImportActivity extends Activity {
         status.setTextSize(12);
         int padding = (int)(10 * getResources().getDisplayMetrics().density);
         status.setPadding(padding,padding/2,padding,padding/2);
-        status.setText("请在学校官网登录，再点「选课结果」→「读取课表」。关闭窗口后清理应用内登录会话。");
+        status.setText("请先完成统一身份认证，再在办事服务大厅进入「本科教务系统」；关闭窗口后清理应用内登录会话。");
         root.addView(status);
         portal = new WebView(this);
         WebSettings settings = portal.getSettings();
@@ -143,7 +146,11 @@ public final class PortalImportActivity extends Activity {
             }
             @Override public void onPageFinished(WebView view, String url) {
                 if (!collecting) read.setEnabled(isResultPage(url));
-                status.setText(isResultPage(url) ? "学校官网 · 选课结果：等待课程加载完成后点击「读取课表」。" : "学校官网 · 请自行登录，登录成功后点击上方「选课结果」。");
+                status.setText(isResultPage(url)
+                    ? "学校官网 · 选课结果：等待课程加载完成后点击「读取课表」。"
+                    : (url!=null && url.contains("ehall.ytu.edu.cn:4106")
+                        ? "统一认证完成后，请在办事服务大厅进入「本科教务系统」，再点击上方「选课结果」。"
+                        : "请先完成统一身份认证，再进入本科教务系统。"));
             }
             @Override public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
                 if (request.isForMainFrame()) status.setText("学校登录页面加载失败，请检查网络或更新 Android System WebView。");
@@ -160,7 +167,7 @@ public final class PortalImportActivity extends Activity {
             byte[] buffer = new byte[4096]; int size;
             while ((size=input.read(buffer)) != -1) output.write(buffer,0,size);
             collector = output.toString(StandardCharsets.UTF_8.name());
-            portal.loadUrl(RESULT_URL);
+            portal.loadUrl(ENTRY_URL);
         } catch (Exception error) { message("无法加载读取组件，请重新安装应用。"); read.setEnabled(false); }
     }
 
