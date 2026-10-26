@@ -51,9 +51,13 @@ public final class PortalImportActivity extends Activity {
     static boolean allowed(String url) {
         if (url == null) return false;
         Uri uri = Uri.parse(url);
+        String host=uri.getHost();
+        boolean schoolHost=host!=null && ("jwxs.ytu.edu.cn".equalsIgnoreCase(host)
+            || "cas.ytu.edu.cn".equalsIgnoreCase(host)
+            || host.toLowerCase(java.util.Locale.ROOT).endsWith(".ytu.edu.cn"));
         return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null
             && (uri.getPort() == -1 || uri.getPort() == 443)
-            && ("jwxs.ytu.edu.cn".equalsIgnoreCase(uri.getHost()) || "cas.ytu.edu.cn".equalsIgnoreCase(uri.getHost()));
+            && schoolHost;
     }
 
     static boolean isResultPage(String url) {
@@ -114,12 +118,19 @@ public final class PortalImportActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSaveFormData(false);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        CookieManager.getInstance().setAcceptThirdPartyCookies(portal,false);
+        // The current YTU SSO and its captcha may use a separate official subdomain.
+        // Cookies are cleared when this temporary portal activity closes.
+        CookieManager.getInstance().setAcceptThirdPartyCookies(portal,true);
         portal.setWebChromeClient(new android.webkit.WebChromeClient());
         portal.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (request.isForMainFrame() ? allowed(request.getUrl().toString()) : resourceAllowed(request.getUrl().toString())) return false;
                 message("当前仅支持学校的教务和统一认证 HTTPS 页面。");
+                return true;
+            }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (allowed(url)) return false;
+                message("当前仅支持学校官方 HTTPS 页面："+url);
                 return true;
             }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -133,6 +144,9 @@ public final class PortalImportActivity extends Activity {
             @Override public void onPageFinished(WebView view, String url) {
                 if (!collecting) read.setEnabled(isResultPage(url));
                 status.setText(isResultPage(url) ? "学校官网 · 选课结果：等待课程加载完成后点击「读取课表」。" : "学校官网 · 请自行登录，登录成功后点击上方「选课结果」。");
+            }
+            @Override public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (request.isForMainFrame()) status.setText("学校登录页面加载失败，请检查网络或更新 Android System WebView。");
             }
         });
         portal.setDownloadListener((url,agent,disposition,mime,length) -> message("无需导出 PDF，请点击上方「读取课表」。"));

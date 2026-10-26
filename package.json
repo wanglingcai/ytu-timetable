@@ -1,6 +1,6 @@
 {
   "name": "ytu-timetable",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "下节啥课：安卓离线课表、文件导入与周次切换",
   "scripts": {

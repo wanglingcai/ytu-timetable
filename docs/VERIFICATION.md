@@ -12,6 +12,12 @@
 
 本轮复核命令：`npm.cmd test`、`npm.cmd run test:ui`、`npm.cmd run format:check`、`powershell -ExecutionPolicy Bypass -File scripts\\build.ps1 -Release`。当前未在实体手机完成测试提醒和完整背景恢复的最终体验验证。
 
+## 0.8.1 烟台大学统一认证跳转兼容
+
+- 门户 WebView 允许学校官方 `*.ytu.edu.cn` HTTPS 子域名，兼容统一认证新增跳转域名；登录窗口启用第三方 Cookie，以兼容验证码和统一认证会话，窗口关闭时仍清理 Cookie 与网页存储。
+- 增加旧版 WebView 的字符串 URL 跳转回调和主页面加载错误提示。Android release 构建与 Lint 通过，版本为 0.8.1 / versionCode 16。
+- 当前仍需在实体手机上验证实际登录、验证码和选课结果读取；若学校后续启用非 `ytu.edu.cn` 的认证域名，需要再次加入白名单。
+
 ## 0.6.3 前端结构整理（界面与数据格式不变）
 
 - 先在原 0.6.3 源码上建立 7 个视觉用例、13 张 Windows Edge 基线，再执行重构。截图仅使用固定模拟数据和时间，覆盖 320/393/768px 首页、列表、详情、非本周、编辑面板、短视口、设置、导入、透明壁纸、添加菜单和空态；重构后的全部截图与原基线零像素差异。图片保存在 `tests/ui/visual-regression.spec.cjs-snapshots/`。
