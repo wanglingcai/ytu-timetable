@@ -13,6 +13,7 @@ public final class ReminderReceiver extends BroadcastReceiver {
             try {
                 if(ReminderScheduler.ACTION.equals(intent.getAction()))ReminderScheduler.fire(context,intent);
                 else ReminderScheduler.refresh(context,true);
+                NextClassWidget.updateAll(context);
             } finally {pending.finish();}
         },"schedule-reminder").start();
     }
