@@ -7,7 +7,7 @@
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:padding="10dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -21,7 +21,7 @@
             android:layout_weight="1"
             android:text="下节啥课"
             android:textColor="#0C4164"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
 
         <TextView
@@ -30,7 +30,9 @@
             android:layout_height="wrap_content"
             android:text="点击开始"
             android:textColor="#1677A8"
-            android:textSize="12sp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -38,23 +40,23 @@
         android:id="@+id/widget_course"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="5dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:text="还没有课表"
         android:textColor="#102F4A"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/widget_meta"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:text="打开应用导入你的课表"
         android:textColor="#34627A"
-        android:textSize="12sp" />
+        android:textSize="11sp" />
 
 </LinearLayout>
