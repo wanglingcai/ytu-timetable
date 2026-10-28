@@ -18,8 +18,6 @@ import java.util.List;
 
 /** Home-screen widget showing the next saved class or personal arrangement. */
 public final class NextClassWidget extends AppWidgetProvider {
-    private static final String PACKAGE = "cn.ytu.timetable";
-
     @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         for (int id : ids) update(context, manager, id);
     }
@@ -34,7 +32,7 @@ public final class NextClassWidget extends AppWidgetProvider {
     }
 
     private static void update(Context context, AppWidgetManager manager, int id) {
-        RemoteViews views = new RemoteViews(PACKAGE, R.layout.widget_next_class);
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_next_class);
         views.setOnClickPendingIntent(R.id.widget_root, openApp(context));
         try {
             JSONObject state = ReminderScheduler.readState(context);

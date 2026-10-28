@@ -129,7 +129,6 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume() {
         super.onResume();
-        NextClassWidget.updateAll(this);
         worker.execute(()->{ReminderScheduler.refresh(getApplicationContext(),false);event("refreshReminderStatus",new JSONObject());});
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results) {
