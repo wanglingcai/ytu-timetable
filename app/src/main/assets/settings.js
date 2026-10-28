@@ -2,7 +2,23 @@
 // Classic script factories also work from Android's offline file URL.
 window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, detail }) {
   const { $, el, toast, showDialog, closeDialog, closeAll } = ui;
+  const REMINDER_HINT_SEEN_KEY = 'ytu-reminder-permission-hint-seen-v1';
+  function reminderHintWasSeen() {
+    try {
+      return window.localStorage.getItem(REMINDER_HINT_SEEN_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+  function markReminderHintSeen() {
+    try {
+      window.localStorage.setItem(REMINDER_HINT_SEEN_KEY, '1');
+    } catch (error) {
+      // The banner is only a convenience hint; settings must still work if storage is unavailable.
+    }
+  }
   function openSettings() {
+    markReminderHintSeen();
     $('semesterInput').value = model.state.semester;
     $('startInput').value = model.state.startDate;
     $('weeksInput').value = model.state.totalWeeks;
@@ -52,14 +68,16 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
     $('reminderStatus').textContent = message;
     $('notificationPermission').hidden = !native;
     if (!native) $('exactReminderPermission').hidden = true;
-    $('reminderPermissionHint').hidden = !(
-      needsPermission &&
-      model.state.courses.some((c) =>
-        c.kind === 'personal'
-          ? c.reminderMinutes !== undefined && c.reminderMinutes >= 0
-          : model.state.reminders.courseMinutes >= 0
-      )
-    );
+    $('reminderPermissionHint').hidden =
+      reminderHintWasSeen() ||
+      !(
+        needsPermission &&
+        model.state.courses.some((c) =>
+          c.kind === 'personal'
+            ? c.reminderMinutes !== undefined && c.reminderMinutes >= 0
+            : model.state.reminders.courseMinutes >= 0
+        )
+      );
   }
   function renderTimes(times) {
     $('timeInputs').replaceChildren();
@@ -112,10 +130,6 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
     $('reminderSettingsButton').onclick = openSettings;
     $('notificationPermission').onclick = () => AndroidLocal.reminderPermission('notifications');
     $('exactReminderPermission').onclick = () => AndroidLocal.reminderPermission('exact');
-    $('testReminderButton').hidden = !(
-      window.AndroidLocal && typeof AndroidLocal.testReminder === 'function'
-    );
-    $('testReminderButton').onclick = () => AndroidLocal.testReminder();
     $('settingsForm').onsubmit = (event) => {
       event.preventDefault();
       if (
@@ -167,6 +181,5 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
       if (persist({ ...model.state, courses: [], sourceName: '' }, '课表已清空')) closeAll();
     };
   }
-  window.receiveReminderTest = (payload) => toast(payload.message || '测试提醒已发送');
   return { openSettings, reminderLabel, refreshReminderStatus, openReminder, bindEvents };
 };

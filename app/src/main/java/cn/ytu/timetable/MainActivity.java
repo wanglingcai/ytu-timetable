@@ -156,12 +156,6 @@ public final class MainActivity extends Activity {
             worker.execute(()->{try{AppearanceStore.clear(MainActivity.this);event("receiveAppearance",AppearanceStore.read(MainActivity.this));}catch(Exception failed){error("恢复默认背景失败，请重试。");}});
         }
         @JavascriptInterface public String reminderStatus() {return ReminderScheduler.status(MainActivity.this);}
-        @JavascriptInterface public void testReminder() {
-            worker.execute(()->{
-                try {ReminderScheduler.test(MainActivity.this);event("receiveReminderTest",new JSONObject().put("message","测试提醒已发送，请查看通知栏。"));}
-                catch(Exception failed){error(failed.getMessage()==null?"测试提醒发送失败。":failed.getMessage());}
-            });
-        }
         @JavascriptInterface public void reminderPermission(String kind) {
             runOnUiThread(()->{
                 try {

@@ -539,6 +539,11 @@ input[type='checkbox'] {
   display: flex;
   gap: 20px;
 }
+.reminder-actions {
+  margin-top: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .detail-name {
   font-size: 23px;
   line-height: 1.6;

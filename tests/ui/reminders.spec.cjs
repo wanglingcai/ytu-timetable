@@ -47,11 +47,13 @@ test('安卓权限入口与状态文案，返回系统设置可刷新',async({pa
     window.AndroidLocal={readState:()=>localStorage.getItem('ytu-timetable-v1')||'',saveState:json=>{localStorage.setItem('ytu-timetable-v1',json);return true;},reminderStatus:()=>JSON.stringify(window.mockPermissions),reminderPermission:kind=>window.permissionCalls.push(kind)};
   });
   await setup(page);await expect(page.locator('#reminderPermissionHint')).toBeVisible();await page.locator('#reminderSettingsButton').click();
+  await expect(page.locator('#reminderPermissionHint')).not.toBeVisible();
+  await expect(page.locator('#testReminderButton')).toHaveCount(0);
   await expect(page.locator('#reminderStatus')).toContainText('通知未开启');await page.locator('#notificationPermission').click();await page.locator('#exactReminderPermission').click();
   expect(await page.evaluate(()=>permissionCalls)).toEqual(['notifications','exact']);
   await page.evaluate(()=>{mockPermissions.notifications=true;refreshReminderStatus();});await expect(page.locator('#reminderStatus')).toContainText('可能延迟');
   await page.evaluate(()=>{mockPermissions.exact=true;mockPermissions.nextAt=new Date(2026,9,25,13,50).getTime();refreshReminderStatus();});await expect(page.locator('#reminderStatus')).toContainText('下一次提醒');await expect(page.locator('#exactReminderPermission')).not.toBeVisible();
-  await expect(page.locator('#reminderPermissionHint')).not.toBeVisible();
+  await expect(page.locator('#reminderPermissionHint')).not.toBeVisible();await page.locator('#settingsDialog .close-dialog').click();await page.reload();await expect(page.locator('#reminderPermissionHint')).not.toBeVisible();await page.locator('#settingsButton').click();
   await page.locator('#settingsDialog').evaluate(dialog=>dialog.scrollTop=0);
   await page.screenshot({path:'test-results/reminder-settings-phone.png'});
 });
