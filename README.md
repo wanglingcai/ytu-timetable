@@ -207,6 +207,17 @@ npm.cmd run format:check
 
 本地预览可执行 node scripts/serve.cjs，地址为 http://127.0.0.1:4173。完整验证记录见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
 
+### 本地文件目录
+
+以下目录只用于本机工作，已加入 `.gitignore`，不会随 Git 提交：
+
+- `local/private-portal/`：原始教务 HTML、PDF 和网页资源；
+- `local/private-course/`：个人课表 CSV 和人工核对记录；
+- `local/work-history/`：历史构建日志、临时脚本、测试截图和旧验证材料；
+- `dist/`：发布 APK、SHA-256 文件、旧版本 APK 归档和宣传素材；当前发布文件直接放在 `dist/`，旧 APK 在 `dist/archive/`。
+
+签名配置、Android SDK、Gradle 缓存、构建目录、Node 依赖和测试输出也都保持在 Git 忽略范围内。提交前可运行 `git status --short --ignored` 检查，只有没有 `!!` 标记的项目文件才会进入版本库。
+
 ### 前端代码组织
 
 | 文件 | 职责 |
