@@ -110,6 +110,25 @@
     if (model.week < model.state.totalWeeks) goWeek(model.week + 1);
   };
   $('weekSelect').onchange = (event) => goWeek(Number(event.target.value));
+  let swipeStart = null;
+  const swipeTarget = $('scheduleSection');
+  swipeTarget.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  });
+  swipeTarget.addEventListener('pointerup', (event) => {
+    if (!swipeStart || swipeStart.id !== event.pointerId) return;
+    const start = swipeStart;
+    swipeStart = null;
+    const dx = event.clientX - start.x,
+      dy = event.clientY - start.y;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    if (dx < 0 && model.week < model.state.totalWeeks) goWeek(model.week + 1);
+    if (dx > 0 && model.week > 1) goWeek(model.week - 1);
+  });
+  swipeTarget.addEventListener('pointercancel', () => {
+    swipeStart = null;
+  });
   $('todayButton').onclick = () => goWeek(T.currentWeek(model.state.startDate));
   $('viewToggle').onclick = () => {
     model.listMode = !model.listMode;
@@ -126,6 +145,7 @@
   render();
   view.animateEntrance();
   refreshReminderStatus();
+  requestAnimationFrame(() => document.body.classList.remove('app-loading'));
   setInterval(() => {
     if (!document.hidden) {
       if (model.renderedDate !== T.dateString(new Date())) render();

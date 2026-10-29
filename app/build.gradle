@@ -15,8 +15,8 @@ android {
         applicationId 'cn.ytu.timetable.personal'
         minSdk 26
         targetSdk 35
-        versionCode 22
-        versionName '0.9.3'
+        versionCode 23
+        versionName '0.9.4'
         testInstrumentationRunner 'cn.ytu.timetable.SmokeInstrumentation'
     }
     signingConfigs {
@@ -40,6 +40,9 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets {
+        androidTest.assets.srcDir "$rootDir/tests/fixtures"
     }
 }
 

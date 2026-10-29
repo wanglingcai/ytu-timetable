@@ -5,7 +5,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -26,273 +25,75 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.net.URL;
-import java.net.SocketTimeoutException;
-import javax.net.ssl.HttpsURLConnection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Official-site browser, deliberately without the local storage JavaScript bridge. */
+/** Generic, read-only portal browser. School-specific URLs and parsing live in adapters. */
 public final class PortalImportActivity extends Activity {
-    static final String ENTRY_URL = "https://cas.ytu.edu.cn/lyuapServer/login?service=https%3A%2F%2Fehall.ytu.edu.cn%3A4106%2F";
-    static final String RESULT_URL = "https://jwxs.ytu.edu.cn/student/courseSelect/courseSelectResult/index";
-    static final String DATA_URL = "https://jwxs.ytu.edu.cn/student/courseSelect/thisSemesterCurriculum/callback";
-    static final int MAX_RESULT_BYTES = 240 * 1024;
+    public static final String EXTRA_SCHOOL_ID = "schoolId";
+    public static final int MAX_RESULT_BYTES = 240 * 1024;
+
     private WebView portal;
     private TextView status;
     private Button read;
     private String collector;
+    private SchoolAdapter adapter;
     private final Handler callbacks = new Handler(Looper.getMainLooper());
     private int readGeneration;
     private boolean collecting;
-    private final ExecutorService network=Executors.newSingleThreadExecutor();
-    private volatile HttpsURLConnection activeConnection;
-    private String apiFailure="";
+    private final ExecutorService network = Executors.newSingleThreadExecutor();
 
-    static boolean allowed(String url) {
-        if (url == null) return false;
-        Uri uri = Uri.parse(url);
-        String host=uri.getHost();
-        boolean schoolHost=host!=null && ("jwxs.ytu.edu.cn".equalsIgnoreCase(host)
-            || "cas.ytu.edu.cn".equalsIgnoreCase(host)
-            || host.toLowerCase(java.util.Locale.ROOT).endsWith(".ytu.edu.cn"));
-        boolean portAllowed=(uri.getPort()==-1 || uri.getPort()==443)
-            || ("ehall.ytu.edu.cn".equalsIgnoreCase(host) && uri.getPort()==4106);
-        return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null
-            && portAllowed
-            && schoolHost;
-    }
-
-    static boolean isResultPage(String url) {
-        if (!allowed(url)) return false;
-        Uri uri = Uri.parse(url);
-        return "jwxs.ytu.edu.cn".equalsIgnoreCase(uri.getHost())
-            && "/student/courseSelect/courseSelectResult/index".equals(uri.getPath());
-    }
-
-    /** Captcha providers are subresources, never destinations for the main page. */
-    static boolean resourceAllowed(String url) {
-        if (allowed(url)) return true;
-        if (url == null) return false;
-        Uri uri=Uri.parse(url);
-        if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getUserInfo()!=null || (uri.getPort()!=-1 && uri.getPort()!=443)) return false;
-        String host=uri.getHost();
-        if (host==null) return false;
-        host=host.toLowerCase(java.util.Locale.ROOT);
-        return host.equals("cstaticdun.126.net") || host.equals("cstaticdun1.126.net")
-            || host.equals("necaptcha.nosdn.127.net") || host.equals("acstatic-dun.126.net") || host.equals("acstatic-dun1.126.net")
-            || host.equals("dun.163.com") || host.endsWith(".dun.163.com")
-            || host.equals("dun.163yun.com") || host.endsWith(".dun.163yun.com");
-    }
-
-    @SuppressLint("SetJavaScriptEnabled") // Official SSO requires JS; no native JS interfaces are exposed.
+    @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(247,247,241));
-        root.setOnApplyWindowInsetsListener((view, insets) -> {
-            if (android.os.Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
-                view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
-            } else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
-            return insets;
-        });
-        LinearLayout actions = new LinearLayout(this);
-        Button close = new Button(this), result = new Button(this);
-        read = new Button(this);
-        close.setText("关闭"); result.setText("选课结果"); read.setText("读取课表");
-        for (Button button : new Button[]{close,result,read}) actions.addView(button,new LinearLayout.LayoutParams(0,-2,1));
-        root.addView(actions);
-        status = new TextView(this);
-        status.setTextSize(12);
-        int padding = (int)(10 * getResources().getDisplayMetrics().density);
-        status.setPadding(padding,padding/2,padding,padding/2);
-        status.setText("请先连接校园网或学校 VPN，再完成统一身份认证；随后在办事服务大厅进入「本科教务系统」。关闭窗口后清理应用内登录会话。");
-        root.addView(status);
-        portal = new WebView(this);
-        WebSettings settings = portal.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setLoadWithOverviewMode(true);
-        settings.setUseWideViewPort(true);
-        settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setSaveFormData(false);
-        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        // The current YTU SSO and its captcha may use a separate official subdomain.
-        // Cookies are cleared when this temporary portal activity closes.
-        CookieManager.getInstance().setAcceptThirdPartyCookies(portal,true);
-        portal.setWebChromeClient(new android.webkit.WebChromeClient());
+        try {
+            PortalImportCoordinator coordinator = PortalImportCoordinator.load(this);
+            String requested = getIntent().getStringExtra(EXTRA_SCHOOL_ID);
+            adapter = coordinator.adapter(requested);
+        } catch (Exception error) {
+            Toast.makeText(this, "学校适配器加载失败，请使用 HTML 或 Excel 导入。", Toast.LENGTH_LONG).show(); finish(); return;
+        }
+        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Color.rgb(247,247,241));
+        root.setOnApplyWindowInsetsListener((view, insets) -> { if (android.os.Build.VERSION.SDK_INT >= 30) { android.graphics.Insets bars = insets.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout()); view.setPadding(bars.left,bars.top,bars.right,bars.bottom); } else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets; });
+        LinearLayout actions = new LinearLayout(this); Button close = new Button(this), result = new Button(this); read = new Button(this); close.setText("关闭"); result.setText("课表页面"); read.setText("读取课表"); for (Button button : new Button[]{close,result,read}) actions.addView(button,new LinearLayout.LayoutParams(0,-2,1)); root.addView(actions);
+        status = new TextView(this); status.setTextSize(12); int padding=(int)(10*getResources().getDisplayMetrics().density); status.setPadding(padding,padding/2,padding,padding/2); status.setText(adapter.config().statusHint); root.addView(status);
+        portal = new WebView(this); WebSettings settings=portal.getSettings(); settings.setJavaScriptEnabled(true); settings.setDomStorageEnabled(true); settings.setLoadWithOverviewMode(true); settings.setUseWideViewPort(true); settings.setAllowFileAccess(false); settings.setAllowContentAccess(false); settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW); settings.setSaveFormData(false); settings.setCacheMode(WebSettings.LOAD_NO_CACHE); CookieManager.getInstance().setAcceptThirdPartyCookies(portal,true); portal.setWebChromeClient(new android.webkit.WebChromeClient());
         portal.setWebViewClient(new WebViewClient() {
-            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (request.isForMainFrame() ? allowed(request.getUrl().toString()) : resourceAllowed(request.getUrl().toString())) return false;
-                message("当前仅支持学校的教务和统一认证 HTTPS 页面。");
-                return true;
-            }
-            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (allowed(url)) return false;
-                message("当前仅支持学校官方 HTTPS 页面："+url);
-                return true;
-            }
-            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                if (request.isForMainFrame() ? allowed(request.getUrl().toString()) : resourceAllowed(request.getUrl().toString())) return null;
-                return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0]));
-            }
-            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
-                readGeneration++; collecting=false; read.setEnabled(false);
-                status.setText("学校网页正在加载，请稍候…");
-            }
-            @Override public void onPageFinished(WebView view, String url) {
-                if (!collecting) read.setEnabled(isResultPage(url));
-                status.setText(isResultPage(url)
-                    ? "学校官网 · 选课结果：等待课程加载完成后点击「读取课表」。"
-                    : (url!=null && url.contains("ehall.ytu.edu.cn:4106")
-                        ? "统一认证完成后，请在办事服务大厅进入「本科教务系统」，再点击上方「选课结果」。"
-                        : "请先完成统一身份认证，再进入本科教务系统。"));
-            }
-            @Override public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, android.webkit.WebResourceError error) {
-                if (request.isForMainFrame()) status.setText("学校登录页面加载失败，请连接校园网或学校 VPN，并更新 Android System WebView。");
-            }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) { String url=request.getUrl().toString(); if (request.isForMainFrame()?adapter.allows(url):adapter.allowsResource(url)) return false; message("当前仅支持"+adapter.name()+"官方 HTTPS 页面。"); return true; }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) { if(adapter.allows(url)) return false; message("当前仅支持"+adapter.name()+"官方 HTTPS 页面。"); return true; }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) { String url=request.getUrl().toString(); if(request.isForMainFrame()?adapter.allows(url):adapter.allowsResource(url)) return null; return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0])); }
+            @Override public void onPageStarted(WebView view,String url,android.graphics.Bitmap icon) { readGeneration++; collecting=false; read.setEnabled(false); status.setText("学校网页正在加载，请稍候…"); }
+            @Override public void onPageFinished(WebView view,String url) { if(!collecting) read.setEnabled(adapter.isCoursePage(url)); status.setText(adapter.isCoursePage(url)?adapter.name()+" · 课表页面：等待课程加载完成后点击「读取课表」。":adapter.config().statusHint); }
+            @Override public void onReceivedError(WebView view,WebResourceRequest request,android.webkit.WebResourceError error) { if(request.isForMainFrame()) status.setText("学校登录页面加载失败，请连接校园网或学校 VPN，并更新 Android System WebView。"); }
         });
-        portal.setDownloadListener((url,agent,disposition,mime,length) -> message("无需导出 PDF，请点击上方「读取课表」。"));
-        root.addView(portal,new LinearLayout.LayoutParams(-1,0,1));
-        setContentView(root);
-        close.setOnClickListener(view -> finish());
-        result.setOnClickListener(view -> portal.loadUrl(RESULT_URL));
-        read.setOnClickListener(view -> collect());
-        try (InputStream input = getAssets().open("portal-extract.js")) {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096]; int size;
-            while ((size=input.read(buffer)) != -1) output.write(buffer,0,size);
-            collector = output.toString(StandardCharsets.UTF_8.name());
-            portal.loadUrl(ENTRY_URL);
-        } catch (Exception error) { message("无法加载读取组件，请重新安装应用。"); read.setEnabled(false); }
+        portal.setDownloadListener((url,agent,disposition,mime,length)->message("无需导出文件，请点击上方「读取课表」。")); root.addView(portal,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root); close.setOnClickListener(view->finish()); result.setOnClickListener(view->portal.loadUrl(adapter.coursePageUrl())); read.setOnClickListener(view->collect());
+        try {
+            collector = collectorScript(this, adapter);
+            portal.loadUrl(adapter.loginUrl());
+        } catch(Exception error) { message("无法加载学校读取组件，请使用 HTML 或 Excel 导入。"); read.setEnabled(false); }
+    }
+
+    static String collectorScript(android.content.Context context, SchoolAdapter adapter) throws Exception {
+        String core = SchoolRegistry.readAsset(context, "core.js");
+        String extractor = SchoolRegistry.readAsset(context, adapter.extractorAsset());
+        // Keep the parser in a private lexical scope, with no native bridge exposed to the portal.
+        return "(function(){var module={exports:{}};\n" + core + "\nvar Timetable=module.exports; var result = " + extractor + "\nreturn result;})()";
     }
 
     private void collect() {
-        if (!isResultPage(portal.getUrl())) { message("请先完成学校官网登录，再打开「选课结果」。"); return; }
-        if (collecting || collector==null) return;
-        collecting=true;
-        read.setEnabled(false);
-        final int generation=++readGeneration;
-        apiFailure="";
-        callbacks.postDelayed(() -> {
-            if (generation==readGeneration && collecting && !isFinishing()) {
-                stopRead(); readError("读取超时，请刷新课表页面后重试。", "TIMEOUT");
-            }
-        },15000);
-        String cookie=CookieManager.getInstance().getCookie(DATA_URL);
-        if(cookie==null || cookie.trim().isEmpty()) {apiFailure="API_NO_SESSION"; collectAttempt(generation,0);}
-        else readOfficialData(generation,cookie,portal.getSettings().getUserAgentString());
+        if(!adapter.isCoursePage(portal.getUrl())) { readError("请先完成学校官网登录，再打开课表页面。",PortalErrorCode.RESULT_PAGE_NOT_FOUND); return; }
+        if(collecting||collector==null)return; collecting=true; read.setEnabled(false); final int generation=++readGeneration; callbacks.postDelayed(()->{if(generation==readGeneration&&collecting&&!isFinishing()){stopRead();readError("读取超时，请刷新课表页面后重试。",PortalErrorCode.TIMEOUT);}},15000);
+        String cookie=CookieManager.getInstance().getCookie(adapter.config().dataUrl);
+        if (adapter.readMethod().contains("api") && cookie != null && !cookie.trim().isEmpty()) readOfficialData(generation,cookie,portal.getSettings().getUserAgentString());
+        else collectAttempt(generation,0);
     }
-
-    private void readOfficialData(int generation, String cookie, String userAgent) {
-        status.setText("正在向学校查询完整课表…");
-        network.execute(() -> {
-            JSONObject payload=null;
-            String failure="API_NETWORK";
-            HttpsURLConnection connection=null;
-            try {
-                connection=(HttpsURLConnection)new URL(DATA_URL).openConnection();
-                activeConnection=connection;
-                connection.setInstanceFollowRedirects(false);
-                connection.setConnectTimeout(4000); connection.setReadTimeout(4000);
-                connection.setUseCaches(false);
-                connection.setRequestProperty("Cookie",cookie);
-                connection.setRequestProperty("User-Agent",userAgent);
-                connection.setRequestProperty("Referer",RESULT_URL);
-                connection.setRequestProperty("Accept","application/json");
-                connection.setRequestProperty("X-Requested-With","XMLHttpRequest");
-                int code=connection.getResponseCode();
-                if(code!=200) failure="API_HTTP_"+code;
-                else try(InputStream input=connection.getInputStream()) {
-                    ByteArrayOutputStream output=new ByteArrayOutputStream();
-                    byte[] buffer=new byte[8192]; int count;
-                    while((count=input.read(buffer))!=-1) {
-                        if(output.size()+count>2*1024*1024) throw new PortalCourseData.InvalidData("API_LIMIT");
-                        output.write(buffer,0,count);
-                    }
-                    String json=output.toString(StandardCharsets.UTF_8.name());
-                    if(json.startsWith("\uFEFF"))json=json.substring(1);
-                    payload=PortalCourseData.toPayload(new JSONObject(json));
-                    if(payload.toString().getBytes(StandardCharsets.UTF_8).length>MAX_RESULT_BYTES) {
-                        payload=null;failure="API_LIMIT";
-                    }
-                }
-            } catch(PortalCourseData.InvalidData error) {failure=error.code;}
-            catch(SocketTimeoutException error) {failure="API_TIMEOUT";}
-            catch(org.json.JSONException error) {failure="API_SCHEMA";}
-            catch(Exception error) {failure="API_NETWORK";}
-            finally {if(connection!=null)connection.disconnect();activeConnection=null;}
-            final JSONObject result=payload;
-            final String reason=failure;
-            callbacks.post(() -> {
-                if(generation!=readGeneration || isFinishing() || isDestroyed())return;
-                if(!isResultPage(portal.getUrl())) {stopRead();readError("页面已切换，请重新打开选课结果后读取。","PAGE_CHANGED");return;}
-                if(result!=null) {completeRead(result);return;}
-                apiFailure=reason;
-                collectAttempt(generation,0);
-            });
-        });
-    }
-
-    private void completeRead(JSONObject data) {
-        stopRead();
-        setResult(RESULT_OK,new Intent().putExtra("portalTimetable",data.toString()));
-        finish();
-    }
-
-    private void collectAttempt(int generation, int attempt) {
-        if (generation!=readGeneration || isFinishing() || isDestroyed()) return;
-        status.setText(attempt==0 ? "正在读取页面中的课程…" : "正在等待官网课程数据加载…");
-        portal.evaluateJavascript(collector, reply -> {
-            if (generation!=readGeneration || isFinishing() || isDestroyed()) return;
-            if (!isResultPage(portal.getUrl())) { stopRead(); readError("页面已切换，请重新打开选课结果后读取。", "PAGE_CHANGED"); return; }
-            try {
-                Object value = new JSONTokener(reply).nextValue();
-                if (!(value instanceof String)) { stopRead(); readError("网页读取脚本没有正常返回，请更新 Android System WebView 或 Chrome 后重试。", "SCRIPT_RESULT"); return; }
-                String text = (String)value;
-                if (text.getBytes(StandardCharsets.UTF_8).length > MAX_RESULT_BYTES) throw new IllegalArgumentException();
-                JSONObject data = new JSONObject(text);
-                if (data.has("error")) {
-                    if (data.optBoolean("retryable") && attempt<6) { callbacks.postDelayed(()->collectAttempt(generation,attempt+1),700); return; }
-                    stopRead(); readError(data.getString("error"),data.optString("code","READ_ERROR")+(apiFailure.isEmpty()?"":"/"+apiFailure)); return;
-                }
-                if (!"ytu-urp".equals(data.getString("source")) || data.getJSONArray("rows").length()>100) throw new IllegalArgumentException();
-                completeRead(data);
-            } catch (Exception error) { stopRead(); readError("读取结果格式异常，可先使用已保存的 HTML 文件导入。", "RESULT_FORMAT"); }
-        });
-    }
-
-    private void stopRead() { readGeneration++; collecting=false; read.setEnabled(isResultPage(portal.getUrl())); }
-
-    private void readError(String text, String code) {
-        status.setText("课表未导入，请按提示重试。");
-        String networkHint=(code.startsWith("API_")||"TIMEOUT".equals(code))
-            ? "\n请确认当前已连接校园网或学校 VPN。" : "";
-        new AlertDialog.Builder(this).setTitle("读取课表未完成").setMessage(text+networkHint+"\n原课表未修改。（"+code+"）")
-            .setPositiveButton("确定",null).setNeutralButton("刷新页面",(dialog,which)->portal.reload()).show();
-    }
-
-    private void message(String text) { Toast.makeText(this,text,Toast.LENGTH_LONG).show(); }
-
-    @Override public void onBackPressed() {
-        if (portal.canGoBack()) portal.goBack(); else super.onBackPressed();
-    }
-
-    @Override protected void onDestroy() {
-        readGeneration++; callbacks.removeCallbacksAndMessages(null);
-        network.shutdownNow();
-        HttpsURLConnection connection=activeConnection;
-        if(connection!=null)connection.disconnect();
-        if (portal != null) {
-            portal.stopLoading(); portal.clearHistory(); portal.clearFormData(); portal.clearCache(true); portal.destroy();
-            CookieManager.getInstance().removeAllCookies(null);
-            WebStorage.getInstance().deleteOrigin("https://cas.ytu.edu.cn");
-            WebStorage.getInstance().deleteOrigin("https://jwxs.ytu.edu.cn");
-        }
-        super.onDestroy();
-    }
+    private void readOfficialData(int generation,String cookie,String userAgent) { status.setText("正在向学校查询完整课表…"); network.execute(()->{ JSONObject result=null; AdapterException failure=null; try{result=adapter.readApi(cookie,userAgent);}catch(AdapterException error){failure=error;} final JSONObject payload=result; final AdapterException reason=failure; callbacks.post(()->{if(generation!=readGeneration||isFinishing()||isDestroyed())return; if(!adapter.isCoursePage(portal.getUrl())){stopRead();readError("页面已切换，请重新打开课表页面后读取。",PortalErrorCode.RESULT_PAGE_NOT_FOUND);return;} if(payload!=null){completeRead(payload);return;} collectAttempt(generation,0);});}); }
+    private void collectAttempt(int generation,int attempt) { if(generation!=readGeneration||isFinishing()||isDestroyed())return; status.setText(attempt==0?"正在读取页面中的课程…":"正在等待学校课程数据加载…"); portal.evaluateJavascript(collector,reply->{if(generation!=readGeneration||isFinishing()||isDestroyed())return; try{if(!adapter.isCoursePage(portal.getUrl()))throw new AdapterException(PortalErrorCode.RESULT_PAGE_NOT_FOUND,"页面已切换，请重新打开课表页面后读取。"); Object value=new JSONTokener(reply).nextValue(); if(!(value instanceof String))throw new IllegalArgumentException(); String text=(String)value; if(text.getBytes(StandardCharsets.UTF_8).length>MAX_RESULT_BYTES)throw new AdapterException(PortalErrorCode.RESPONSE_TOO_LARGE,"课表结果过大，请使用 HTML 或 Excel 导入。"); JSONObject data=new JSONObject(text); if(data.has("error")){boolean retryable=data.optBoolean("retryable"); if(retryable&&attempt<6){callbacks.postDelayed(()->collectAttempt(generation,attempt+1),700);return;} stopRead();readError(data.optString("error","当前学校页面结构发生变化，请使用 HTML 或 Excel 导入，或者提交学校适配请求。"),mapError(data.optString("code")));return;} if(!adapter.config().source.equals(data.optString("source"))||data.optJSONArray("courses")==null||data.optJSONArray("courses").length()==0||data.optJSONArray("courses").length()>100)throw new AdapterException(PortalErrorCode.UNSUPPORTED_LAYOUT,"当前学校页面结构发生变化，请使用 HTML 或 Excel 导入，或者提交学校适配请求。"); completeRead(data);}catch(AdapterException error){stopRead();readError(error.getMessage(),error.code);}catch(Exception error){stopRead();readError("当前学校页面结构发生变化，请使用 HTML 或 Excel 导入，或者提交学校适配请求。",PortalErrorCode.UNSUPPORTED_LAYOUT);}}); }
+    private static PortalErrorCode mapError(String code) { if("NO_TABLE".equals(code)||"EMPTY_TABLE".equals(code)||"COURSE_NOT_FOUND".equals(code))return PortalErrorCode.COURSE_NOT_FOUND; if("FRAME_UNAVAILABLE".equals(code)||"MOBILE_DETAILS".equals(code)||"UNSUPPORTED_LAYOUT".equals(code))return PortalErrorCode.UNSUPPORTED_LAYOUT; if("API_SCHEMA_CHANGED".equals(code)||"API_SCHEMA".equals(code))return PortalErrorCode.API_SCHEMA_CHANGED; if("TIMEOUT".equals(code))return PortalErrorCode.TIMEOUT; return PortalErrorCode.UNSUPPORTED_LAYOUT; }
+    private void completeRead(JSONObject data){try{data.put("schoolName",adapter.name());}catch(Exception ignored){}stopRead();setResult(RESULT_OK,new Intent().putExtra("portalTimetable",data.toString()).putExtra(EXTRA_SCHOOL_ID,adapter.id()));finish();}
+    private void stopRead(){readGeneration++;collecting=false;if(read!=null&&portal!=null)read.setEnabled(adapter.isCoursePage(portal.getUrl()));}
+    private void readError(String text,PortalErrorCode code){status.setText("课表未导入，请按提示重试。");String message=(code==PortalErrorCode.UNSUPPORTED_LAYOUT||code==PortalErrorCode.API_SCHEMA_CHANGED||code==PortalErrorCode.COURSE_NOT_FOUND)?"当前学校页面结构发生变化，请使用 HTML 或 Excel 导入，或者提交学校适配请求。":text;new AlertDialog.Builder(this).setTitle("读取课表未完成").setMessage(message+"\n原课表未修改。（"+code.name()+"）").setPositiveButton("确定",null).setNeutralButton("刷新页面",(dialog,which)->portal.reload()).show();}
+    private void message(String text){Toast.makeText(this,text,Toast.LENGTH_LONG).show();}
+    @Override public void onBackPressed(){if(portal.canGoBack())portal.goBack();else super.onBackPressed();}
+    @Override protected void onDestroy(){readGeneration++;callbacks.removeCallbacksAndMessages(null);network.shutdownNow();if(portal!=null){portal.stopLoading();portal.clearHistory();portal.clearFormData();portal.clearCache(true);portal.destroy();CookieManager.getInstance().removeAllCookies(null);if(adapter!=null)for(String host:adapter.allowedHosts()){WebStorage.getInstance().deleteOrigin("https://"+host);java.util.Set<Integer> ports=adapter.config().allowedPorts.get(host);if(ports!=null)for(int port:ports)WebStorage.getInstance().deleteOrigin("https://"+host+":"+port);}}super.onDestroy();}
 }

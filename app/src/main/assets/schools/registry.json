@@ -1,0 +1,8 @@
+[
+  {
+    "id": "ytu",
+    "name": "烟台大学",
+    "adapter": "ytu-urp",
+    "config": "schools/ytu/config.json"
+  }
+]

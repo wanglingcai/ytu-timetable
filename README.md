@@ -2,7 +2,7 @@
 
 一个简洁、免费、公开源码的 Android 课表应用。它把课表保存在手机本地，打开就能查看下一节课、周视图和个人安排，也支持到点提醒、完整备份和自定义背景。
 
-当前源码版本：**0.9.3（versionCode 22）**。项目最初为烟台大学使用，应用名称从“烟大随课”改为“下节啥课”，现在同时支持通用表格导入，并持续适配其他高校的教务平台。
+当前源码版本：**0.9.4（versionCode 23）**。项目最初为烟台大学使用，应用名称从“烟大随课”改为“下节啥课”，现在同时支持通用表格导入，并持续适配其他高校的教务平台。
 
 ## 为什么做这个项目
 
@@ -23,7 +23,7 @@
 - **周视图**：左右切换周次；当前周使用淡彩课程卡片，其他周的课程以灰色显示作为参考。
 - **个人安排**：点击空白课时添加自习、运动、会议或待办，支持地点、备注、重复周次和修改删除。
 - **多种导入方式**：支持 .xlsx、.xls、.csv、.tsv、.html、.htm 和本应用 .json 完整备份。
-- **烟台大学官网登录读取（测试）**：从统一身份认证进入 eHall 和本科教务系统，登录后读取“选课结果”，再由用户核对并保存。
+- **学校适配器官网登录读取（测试）**：从已注册学校的统一身份认证进入教务系统，登录后读取课表，再由用户核对并保存；当前注册烟台大学 URP。
 - **导入变化对比**：再次导入时显示新增、删除和调整的课程，确认后才替换原课表。
 - **到点提醒**：课程和个人安排可以分别设置提醒时间，支持安卓通知和精确提醒权限。
 - **完整备份**：导出和恢复课表、个人安排、提醒、学期设置、外观参数和背景图。
@@ -58,8 +58,8 @@
 | 位置 | 用法 |
 | --- | --- |
 | 顶部“接下来” | 查看最近一节课或个人安排，点击可定位到实际日期所在周。 |
-| 周次切换栏 | 左右切换周次，点击“回到本周”返回当前周。 |
-| 课表网格 | 点击课程查看详情；点击空白格直接添加个人安排。灰色课程表示它不在当前所选周上课。 |
+| 周次切换栏 | 点击左右按钮或在课表区域左右滑动切换周次，点击“回到本周”返回当前周。 |
+| 课表网格 | 左右滑动切换上下周；点击课程查看详情；点击空白格直接添加个人安排。灰色课程表示它不在当前所选周上课。 |
 | 底部“全部安排” | 查看其他周的个人安排和课程列表。 |
 | 底部“＋ 添加” | 添加个人安排，或打开文件、备份和官网导入入口。 |
 | 右上角齿轮 | 设置学期、节次、提醒、背景图和通知权限。 |
@@ -97,16 +97,16 @@
 
 示例模板和模拟 URP 文件位于 [examples/](examples/)。仓库中的示例不含个人资料，也不是学校真实课表。
 
-### 烟台大学官网导入
+### 学校官网导入
 
-当前适配烟台大学统一身份认证、eHall 办事服务大厅和本科教务系统的“选课结果”页面：
+在“导入课表”中选择“选择已支持的学校”，再点击“官网登录读取”。当前适配烟台大学统一身份认证、eHall 办事服务大厅和本科教务系统的“选课结果”页面：
 
-1. 点击“导入 → 烟台大学教务系统”。
+1. 点击“导入 → 选择已支持的学校 → 烟台大学”。
 2. 按学校正常流程输入账号、密码和验证码；应用不代填，也不保存账号密码。
 3. 登录后进入“本科教务系统 → 选课结果”，等课程卡片完全出现，再点击“读取课表”。
 4. 核对导入预览，确认后保存。
 
-官网读取需要手机能访问学校网络。普通流量无法打开时，请连接校园网或学校 VPN。应用只读取课表，不执行选课、退课或其他教务操作；登录窗口关闭时会清理应用内的学校 Cookie、缓存和网页存储。
+官网读取需要手机能访问学校网络。普通流量无法打开时，请连接校园网或学校 VPN。应用只读取课表，不执行选课、退课或其他教务操作；每个学校适配器只允许配置中的 HTTPS 主机，登录窗口关闭时会清理应用内的学校 Cookie、缓存和网页存储。
 
 如果官网页面版本变化、验证码不兼容或暂时无法访问，可以在电脑登录“选课结果”页面后保存完整 HTML，再把 .html 文件导入应用。PDF、图片和扫描件目前不能直接识别，需要先人工转换并校对为表格或 HTML。
 
@@ -138,7 +138,7 @@
 | PDF、图片识别 | 暂不支持直接识别。 |
 | 后台自动同步、多学期切换 | 暂未实现。 |
 
-不同学校的统一认证、验证码、教务平台和课表字段差异很大。项目会把学校入口和解析规则逐步拆成独立适配器，优先保证登录范围受控、数据只读、失败时不覆盖原课表。
+不同学校的统一认证、验证码、教务平台和课表字段差异很大。学校入口和解析规则现在由注册表、配置文件和独立适配器管理，优先保证登录范围受控、数据只读、失败时不覆盖原课表。未适配的学校仍可使用 HTML、Excel、CSV、TSV 或 JSON 文件导入。
 
 ## 欢迎参与
 
@@ -155,6 +155,29 @@
 2. 只读取用户主动打开的课表页面，不自动选课或退课。
 3. 优先使用公开的只读接口，接口不可用时再解析页面或导入 HTML。
 4. 为解析规则配套脱敏 fixture 和测试，学校页面变化时能及时发现。
+
+### 增加学校适配器
+
+新增学校不需要修改首页、提醒、小组件或备份逻辑，按下面步骤提交：
+
+1. 在 `app/src/main/assets/schools/<id>/config.json` 添加学校名称、登录入口、课表页面、只读接口、HTTPS 域名白名单和验证码资源域名。
+2. 在 `app/src/main/assets/schools/<id>/portal-extract.js` 实现登录后页面读取，并在 `app/src/main/assets/schools/registry.json` 注册 `id`、名称、适配器和配置路径；在 `SchoolRegistry` 增加对应适配器的构造映射。
+3. 在 `app/src/main/java/cn/ytu/timetable/adapters/` 实现 `SchoolAdapter` 的登录入口、课表地址、读取方式和解析规则。接口和网页读取结果均提供统一课程字段：`name`、`teacher`、`room`、`day`、`start`、`end`、`weeks`。烟台大学网页读取脚本使用注入的本地 `Timetable.parseMatrix` 转换网格。
+4. 在 `tests/fixtures/schools/<id>/` 添加脱敏的 `course-result.html`、`api-response.json` 和 `expected-courses.json`，覆盖多门课程、单双周、缺少安排和页面改版错误。
+5. 添加适配器测试，运行 `npm.cmd test` 和 `.\gradlew.bat :app:compileDebugJavaWithJavac`，再提交 Pull Request。
+
+烟台大学的 Android 适配器回归检查可在模拟器上安装 debug APK 和 androidTest APK 后运行：
+
+~~~powershell
+.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+adb install -r app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+adb shell am instrument -w -r -e adapters true cn.ytu.timetable.personal.test/cn.ytu.timetable.SmokeInstrumentation
+~~~
+
+该检查使用脱敏样例比较实际 Java 接口解析和 Android WebView 网页读取的课程字段，覆盖单双周、地址白名单和页面改版提示，不访问学校账号。
+
+适配器错误使用 `LOGIN_REQUIRED`、`RESULT_PAGE_NOT_FOUND`、`NETWORK_UNAVAILABLE`、`COURSE_NOT_FOUND`、`UNSUPPORTED_LAYOUT` 和 `API_SCHEMA_CHANGED` 等稳定类型。页面结构变化时，应用会提示使用文件导入或提交适配请求，不会覆盖原课表。
 
 欢迎先提 Issue 讨论方案，再提交 Pull Request。即使暂时不会写代码，提供一次清晰的使用反馈也很有帮助。
 
@@ -195,9 +218,11 @@ npm.cmd run format:check
 | courses.js | 课程和个人安排的详情、编辑、删除和重复周次。 |
 | settings.js | 学期、节次、提醒、权限和外观设置。 |
 | import.js | 文件、官网、备份和示例导入。 |
-| portal-extract.js | 官网课表页面的数据读取和标准化。 |
+| schools/ytu/portal-extract.js | 烟台大学官网课表页面的数据读取；其他学校使用各自目录中的脚本。 |
 | app.js | 状态、保存、周次导航和模块组装。 |
 | app/src/main/java/ | Android 文件选择、私有存储、图片、提醒和 WebView 外壳。 |
+
+学校适配器相关文件集中在 `app/src/main/assets/schools/` 和 `app/src/main/java/cn/ytu/timetable/adapters/`：注册表是 `schools/registry.json`，烟台大学配置和网页读取脚本分别是 `schools/ytu/config.json` 与 `schools/ytu/portal-extract.js`，通用入口通过 `SchoolRegistry`、`SchoolAdapter` 和 `PortalImportCoordinator` 动态解析。
 
 ## 已知限制和后续方向
 

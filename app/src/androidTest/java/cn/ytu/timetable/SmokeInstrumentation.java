@@ -23,9 +23,11 @@ public final class SmokeInstrumentation extends Instrumentation {
     private int checks;
     private boolean verifyExisting;
     private String reminderMode;
+    private boolean adapterMode;
     private final StringBuilder report = new StringBuilder();
-    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); start(); }
+    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); start(); }
     @Override public void onStart() {
+        if(adapterMode){new AdapterChecks(this).run();return;}
         if(reminderMode!=null){new ReminderChecks(this).run(reminderMode);return;}
         Bundle result = new Bundle();
         try {
@@ -66,31 +68,32 @@ public final class SmokeInstrumentation extends Instrumentation {
             js("document.querySelector('#courseDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
             check("document.documentElement.scrollWidth<=innerWidth", "手机界面没有横向溢出");
             checkAppearance();
-            if (!PortalImportActivity.allowed("https://cas.ytu.edu.cn/lyuapServer/login")
-                || !PortalImportActivity.isResultPage(PortalImportActivity.RESULT_URL)
-                || PortalImportActivity.allowed("http://jwxs.ytu.edu.cn/")
-                || PortalImportActivity.allowed("https://jwxs.ytu.edu.cn.evil.example/")
-                || PortalImportActivity.allowed("https://cas.ytu.edu.cn@evil.example/")
-                || PortalImportActivity.allowed("https://jwxs.ytu.edu.cn:8443/")
-                || PortalImportActivity.isResultPage("https://cas.ytu.edu.cn/student/courseSelect/courseSelectResult/index")) throw new AssertionError("Portal URL policy");
+            SchoolConfig config = SchoolRegistry.load(getTargetContext()).get("ytu").config();
+            if (!config.allowed("https://cas.ytu.edu.cn/lyuapServer/login")
+                || !config.isResultPage(config.resultUrl)
+                || config.allowed("http://jwxs.ytu.edu.cn/")
+                || config.allowed("https://jwxs.ytu.edu.cn.evil.example/")
+                || config.allowed("https://cas.ytu.edu.cn@evil.example/")
+                || config.allowed("https://jwxs.ytu.edu.cn:8443/")
+                || config.isResultPage("https://cas.ytu.edu.cn/student/courseSelect/courseSelectResult/index")) throw new AssertionError("Portal URL policy");
             checks++; report.append("✓ 教务网址仅允许两个官方 HTTPS 主机和准确课表路径\n");
-            if (!PortalImportActivity.resourceAllowed("https://cstaticdun.126.net/load.min.js")
-                || !PortalImportActivity.resourceAllowed("https://c.dun.163.com/api/v2/getconf")
-                || !PortalImportActivity.resourceAllowed("https://necaptcha.nosdn.127.net/image.png")
-                || PortalImportActivity.allowed("https://c.dun.163.com/")
-                || PortalImportActivity.resourceAllowed("https://c.dun.163.com.evil.example/")
-                || PortalImportActivity.resourceAllowed("http://cstaticdun.126.net/load.min.js")) throw new AssertionError("Captcha resource policy");
+            if (!config.resourceAllowed("https://cstaticdun.126.net/load.min.js")
+                || !config.resourceAllowed("https://c.dun.163.com/api/v2/getconf")
+                || !config.resourceAllowed("https://necaptcha.nosdn.127.net/image.png")
+                || config.allowed("https://c.dun.163.com/")
+                || config.resourceAllowed("https://c.dun.163.com.evil.example/")
+                || config.resourceAllowed("http://cstaticdun.126.net/load.min.js")) throw new AssertionError("Captcha resource policy");
             checks++; report.append("✓ 易盾 HTTPS 资源可加载，主页面仍限制为学校域名\n");
             Activity offline = activity;
             ActivityMonitor portalMonitor=addMonitor(PortalImportActivity.class.getName(),null,false);
-            js("AndroidLocal.importPortal();true");
+            js("AndroidLocal.importPortal(\"ytu\");true");
             activity=waitForMonitorWithTimeout(portalMonitor,10000);
             removeMonitor(portalMonitor);
             if(activity==null)throw new AssertionError("Portal activity not opened");
             final WebView remote=findWeb(activity.getWindow().getDecorView());
             String mock="<table id='courseTable'><tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th></tr><tr><th>第1节</th><td><div class='class_div'><p>官网登录模拟课</p><p>模拟教师*</p><p>1-16周双周</p><p>1-2节</p><p>模拟楼101</p></div></td><td></td><td></td></tr></table>";
             String delayed="<html><body>课程加载中<script>setTimeout(function(){document.body.innerHTML="+org.json.JSONObject.quote(mock)+";},1800);</script></body></html>";
-            runOnMainSync(()->remote.loadDataWithBaseURL(PortalImportActivity.RESULT_URL,delayed,"text/html","UTF-8",PortalImportActivity.RESULT_URL));
+            runOnMainSync(()->remote.loadDataWithBaseURL(config.resultUrl,delayed,"text/html","UTF-8",config.resultUrl));
             await("document.readyState==='complete'");
             check("typeof AndroidLocal==='undefined'", "官网 WebView 无本地存储桥接接口");
             CountDownLatch cookiesCleared=new CountDownLatch(1);
@@ -109,6 +112,18 @@ public final class SmokeInstrumentation extends Instrumentation {
             }
             if(apiPayload.getJSONArray("rows").length()!=4 || apiPayload.getJSONArray("warnings").length()!=1
                 || apiPayload.toString().contains("FAKE-NOT-TO-KEEP") || apiPayload.toString().contains("mock-private-field"))throw new AssertionError("API fixture mapping or field filtering");
+            org.json.JSONArray normalized = apiPayload.getJSONArray("courses");
+            if (normalized.length()!=3) throw new AssertionError("Standard course count");
+            boolean odd=false, even=false, practice=false;
+            for (int i=0; i<normalized.length(); i++) {
+                org.json.JSONObject course=normalized.getJSONObject(i);
+                String name=course.getString("name"), room=course.getString("room");
+                org.json.JSONArray weeks=course.getJSONArray("weeks");
+                if (name.equals("模拟课程甲_01") && course.getInt("day")==2 && course.getInt("start")==1 && course.getInt("end")==2 && room.equals("模拟校区A楼101") && course.getString("teacher").equals("教师甲 教师乙") && weeks.toString().equals("[1,3,5,7,9,11,13,15,17]")) odd=true;
+                if (name.equals("模拟课程甲_01") && course.getInt("day")==4 && room.equals("模拟校区B楼202") && weeks.toString().equals("[2,4,6,8]")) even=true;
+                if (name.equals("模拟实践_02") && course.getInt("start")==11 && course.getInt("end")==12 && weeks.toString().equals("[10,11]")) practice=true;
+            }
+            if (!odd || !even || !practice) throw new AssertionError("Standard course fields or odd/even weeks");
             checks++;report.append("✓ 官网接口模拟响应转换三条安排，仅保留课表字段\n");
             boolean invalidRejected=false;
             try{PortalCourseData.toPayload(new org.json.JSONObject("{\"unrelated\":true}"));}catch(PortalCourseData.InvalidData expected){invalidRejected=true;}

@@ -139,13 +139,30 @@
               ' 门课程未在网格显示，本次只读取网格内有明确时间的安排，请另行核对。'
           ]
         : [];
+    var parsed = Timetable.parseMatrix(rows, merges, '学校课表');
+    if (!parsed.courses.length)
+      return fail(
+        '当前学校页面结构发生变化，请使用 HTML 或 Excel 导入，或者提交学校适配请求。',
+        'UNSUPPORTED_LAYOUT',
+        false
+      );
+    warnings = warnings.concat(parsed.warnings);
     return JSON.stringify({
       source: 'ytu-urp',
-      rows: rows,
-      merges: merges,
+      courses: parsed.courses.map(function (course) {
+        return {
+          name: course.name,
+          teacher: course.teacher,
+          room: course.room,
+          day: course.day,
+          start: course.start,
+          end: course.end,
+          weeks: course.weeks
+        };
+      }),
       warnings: warnings,
       cardCount: cards,
-      collectorVersion: 2
+      collectorVersion: 3
     });
   } catch (error) {
     return fail(

@@ -1,10 +1,10 @@
 {
   "name": "ytu-timetable",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "private": true,
   "description": "下节啥课：安卓离线课表、文件导入与周次切换",
   "scripts": {
-    "test": "node --test tests/core.test.cjs",
+    "test": "node --test tests/*.test.cjs",
     "fixtures": "node scripts/make-fixtures.cjs",
     "test:ui": "playwright test",
     "test:visual": "playwright test tests/ui/visual-regression.spec.cjs",

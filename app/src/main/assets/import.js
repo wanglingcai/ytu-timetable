@@ -231,13 +231,21 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
     try {
       if (
         !payload ||
-        payload.source !== 'ytu-urp' ||
-        !Array.isArray(payload.rows) ||
-        payload.rows.length > 100 ||
-        payload.rows.some((row) => !Array.isArray(row) || row.length > 32)
+        typeof payload.source !== 'string' ||
+        (!Array.isArray(payload.courses) && !Array.isArray(payload.rows)) ||
+        (Array.isArray(payload.courses) && payload.courses.length > 100) ||
+        (Array.isArray(payload.rows) &&
+          (payload.rows.length > 100 ||
+            payload.rows.some((row) => !Array.isArray(row) || row.length > 32)))
       )
         throw new Error('教务课表数据结构无效');
-      preview = T.parseMatrix(payload.rows, payload.merges || [], '烟台大学教务系统');
+      const schoolName = payload.schoolName || payload.school || '学校教务系统';
+      preview = Array.isArray(payload.courses)
+        ? {
+            courses: payload.courses.map((course, index) => T.validateCourse(course, index)),
+            warnings: []
+          }
+        : T.parseMatrix(payload.rows, payload.merges || [], schoolName);
       if (!preview.courses.length)
         throw new Error(
           '已读取到 ' +
@@ -252,7 +260,7 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
             .slice(0, 20)
             .map((x) => x.slice(0, 2000))
         );
-      preview.name = '烟台大学教务系统';
+      preview.name = schoolName;
       preview.format = '官网登录读取（测试）';
       showPreview();
     } catch (error) {
@@ -273,9 +281,35 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
     $('portalImport').onclick = () => {
       closeDialog('importChoice');
       if (window.AndroidLocal && typeof AndroidLocal.importPortal === 'function')
-        AndroidLocal.importPortal();
+        AndroidLocal.importPortal($('portalSchool') ? $('portalSchool').value : 'ytu');
       else toast('官网登录导入需要在安卓应用中使用；浏览器预览可导入已保存的 HTML 课表。');
     };
+    if (
+      window.AndroidLocal &&
+      typeof AndroidLocal.listSchools === 'function' &&
+      $('portalSchool')
+    ) {
+      try {
+        const schools = JSON.parse(AndroidLocal.listSchools());
+        if (Array.isArray(schools) && schools.length) {
+          $('portalSchool').replaceChildren(
+            ...schools
+              .filter(
+                (school) =>
+                  school && typeof school.id === 'string' && typeof school.name === 'string'
+              )
+              .map((school) => {
+                const option = document.createElement('option');
+                option.value = school.id;
+                option.textContent = school.name;
+                return option;
+              })
+          );
+        }
+      } catch (error) {
+        // Keep the packaged fallback option when the registry cannot be read.
+      }
+    }
     $('fileInput').addEventListener('change', async (event) => {
       const file = event.target.files[0];
       event.target.value = '';

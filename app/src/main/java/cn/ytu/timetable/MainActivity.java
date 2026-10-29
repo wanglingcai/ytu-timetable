@@ -172,8 +172,13 @@ public final class MainActivity extends Activity {
                 }catch(Exception unavailable){error("无法打开提醒权限设置，请在系统设置中找到本应用并检查通知权限。");}
             });
         }
-        @JavascriptInterface public void importPortal() {
-            runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, PortalImportActivity.class), IMPORT_PORTAL));
+        @JavascriptInterface public String listSchools() {
+            try { return PortalImportCoordinator.load(MainActivity.this).schools().toString(); }
+            catch (Exception failed) { return "[]"; }
+        }
+        @JavascriptInterface public void importPortal(String schoolId) {
+            final String id = schoolId == null ? "" : schoolId.trim();
+            runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, PortalImportActivity.class).putExtra(PortalImportActivity.EXTRA_SCHOOL_ID, id), IMPORT_PORTAL));
         }
         @JavascriptInterface public String readState() {
             synchronized (ReminderScheduler.LOCK) {

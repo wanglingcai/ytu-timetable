@@ -1,0 +1,32 @@
+{
+  "id": "ytu",
+  "name": "烟台大学",
+  "platform": "urp",
+  "source": "ytu-urp",
+  "entryUrl": "https://cas.ytu.edu.cn/lyuapServer/login?service=https%3A%2F%2Fehall.ytu.edu.cn%3A4106%2F",
+  "resultUrl": "https://jwxs.ytu.edu.cn/student/courseSelect/courseSelectResult/index",
+  "dataUrl": "https://jwxs.ytu.edu.cn/student/courseSelect/thisSemesterCurriculum/callback",
+  "extractorAsset": "schools/ytu/portal-extract.js",
+  "readMethod": "api_then_dom",
+  "parser": "ytu-urp",
+  "resultHost": "jwxs.ytu.edu.cn",
+  "resultPath": "/student/courseSelect/courseSelectResult/index",
+  "allowedHosts": [
+    "cas.ytu.edu.cn",
+    "ehall.ytu.edu.cn",
+    "jwxs.ytu.edu.cn"
+  ],
+  "allowedPorts": {
+    "ehall.ytu.edu.cn": [4106]
+  },
+  "captchaHosts": [
+    "cstaticdun.126.net",
+    "cstaticdun1.126.net",
+    "necaptcha.nosdn.127.net",
+    "acstatic-dun.126.net",
+    "acstatic-dun1.126.net",
+    "dun.163.com",
+    "dun.163yun.com"
+  ],
+  "statusHint": "请先连接校园网或学校 VPN，再完成统一身份认证；随后在办事服务大厅进入「本科教务系统」。关闭窗口后清理应用内登录会话。"
+}

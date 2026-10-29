@@ -20,7 +20,7 @@
     <script src="import.js" defer></script>
     <script src="app.js" defer></script>
   </head>
-  <body>
+  <body class="app-loading">
     <div id="wallpaper" class="wallpaper" aria-hidden="true" hidden>
       <img id="wallpaperImage" alt="" />
       <div class="wallpaper-mask"></div>
@@ -107,9 +107,11 @@
           <span id="noWeekLabel">这一周还没有安排，点空白格试试。</span
           ><button id="allCoursesButton" class="text-button">查看全部安排</button>
         </div>
-        <p class="small schedule-hint">点击空白格添加个人安排 · 灰色为非本周课程</p>
+        <p class="small schedule-hint">
+          左右滑动切换周次 · 点击空白格添加个人安排 · 灰色为非本周课程
+        </p>
       </section>
-      <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.8.2</footer>
+      <footer><span id="saveLabel">本地保存 · 离线可用</span><span>·</span> v0.9.4</footer>
     </main>
     <nav class="quickbar" aria-label="课表操作">
       <button id="allButton" class="quick-action">全部安排</button
@@ -126,10 +128,13 @@
         </div>
         <button class="close-dialog icon-button" aria-label="关闭">×</button>
       </div>
+      <label class="small" for="portalSchool">选择已支持的学校</label>
+      <select id="portalSchool" aria-label="选择已支持的学校">
+        <option value="ytu">烟台大学</option>
+      </select>
       <button id="portalImport" class="choice-option">
         <span class="choice-icon" aria-hidden="true">校</span
-        ><span
-          ><strong>烟台大学教务系统</strong><small>在官网登录，读取本学期课表 · 测试</small></span
+        ><span><strong>官网登录读取</strong><small>在官网登录，读取本学期课表</small></span
         ><span aria-hidden="true">›</span>
       </button>
       <button id="fileImport" class="choice-option">
