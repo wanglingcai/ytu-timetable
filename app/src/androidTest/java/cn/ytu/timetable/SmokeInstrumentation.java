@@ -24,9 +24,11 @@ public final class SmokeInstrumentation extends Instrumentation {
     private boolean verifyExisting;
     private String reminderMode;
     private boolean adapterMode;
+    private boolean selfPortalMode;
     private final StringBuilder report = new StringBuilder();
-    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); start(); }
+    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); selfPortalMode=args!=null && "true".equals(args.getString("selfPortal")); start(); }
     @Override public void onStart() {
+        if(selfPortalMode){checkSelfPortal();return;}
         if(adapterMode){new AdapterChecks(this).run();return;}
         if(reminderMode!=null){new ReminderChecks(this).run(reminderMode);return;}
         Bundle result = new Bundle();
@@ -207,6 +209,39 @@ public final class SmokeInstrumentation extends Instrumentation {
         checks++;report.append("✓ 恢复默认删除私有图片并重置遮罩与模糊\n");
         check("AndroidLocal.readState()==="+timetable,"选图失败和恢复默认后课程与个人安排完整保留");
         js("document.querySelector('#settingsDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
+    }
+    @SuppressWarnings("unchecked")
+    private void checkSelfPortal() {
+        Bundle result = new Bundle();
+        try {
+            launch(); await("document.readyState==='complete' && !!window.receivePortalImport");
+            String before=js("AndroidLocal.readState()");
+            Activity offline=activity;
+            ActivityMonitor monitor=addMonitor(SelfPortalActivity.class.getName(),null,false);
+            js("document.querySelector('#importButton').click();document.querySelector('#selfPortalImport').click();true");
+            Activity self=waitForMonitorWithTimeout(monitor,10000);
+            if(self==null)throw new AssertionError("自助导入窗口未打开");
+            java.lang.reflect.Field origins=SelfPortalActivity.class.getDeclaredField("allowedOrigins"); origins.setAccessible(true);
+            ((java.util.Set<String>)origins.get(self)).add("https://fixture.test");
+            java.lang.reflect.Field field=SelfPortalActivity.class.getDeclaredField("portal"); field.setAccessible(true); WebView web=(WebView)field.get(self);
+            String html="<table><tr><th>课程名称</th><th>星期</th><th>节次</th><th>周次</th><th>教室</th></tr><tr><td>模拟数学</td><td>星期一</td><td>1-2</td><td>1-16</td><td>A101</td></tr></table>";
+            runOnMainSync(()->{web.setWebViewClient(new android.webkit.WebViewClient(){@Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view,android.webkit.WebResourceRequest request){return new android.webkit.WebResourceResponse("text/html","UTF-8",new java.io.ByteArrayInputStream(html.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}}); web.loadUrl("https://fixture.test/");});
+            long until=System.currentTimeMillis()+10000;
+            AtomicReference<Integer> progress=new AtomicReference<>(0);
+            while(System.currentTimeMillis()<until){runOnMainSync(()->progress.set(web.getUrl()!=null && web.getUrl().startsWith("https://fixture.test/") ? web.getProgress() : 0));if(progress.get()==100)break;Thread.sleep(100);}
+            waitForIdleSync();
+            java.lang.reflect.Field readField=SelfPortalActivity.class.getDeclaredField("read"); readField.setAccessible(true); Button button=(Button)readField.get(self); runOnMainSync(()->button.setEnabled(true));
+            AtomicReference<Boolean> enabled=new AtomicReference<>(false);
+            until=System.currentTimeMillis()+10000; while(System.currentTimeMillis()<until){runOnMainSync(()->enabled.set(button.isEnabled()));if(enabled.get())break;Thread.sleep(100);}
+            if(!enabled.get())throw new AssertionError("课表页面未能读取");
+            runOnMainSync(button::performClick); activity=offline;
+            await("document.querySelector('#importDialog').open");
+            check("document.querySelector('#previewList').textContent.includes('模拟数学') && document.querySelector('#previewList').textContent.includes('A101')", "原生网页读取结果进入预览");
+            check("AndroidLocal.readState()==="+before, "预览确认前原课表未修改");
+            js("document.querySelector('#cancelImport').click();true");
+            check("AndroidLocal.readState()==="+before, "取消预览保留原课表");
+            result.putString("stream", "\nPASS: " + checks + " self portal checks\n" + report); finish(Activity.RESULT_OK,result);
+        } catch (Throwable error) { result.putString("stream", "\nFAIL: " + error + "\n" + android.util.Log.getStackTraceString(error)); finish(Activity.RESULT_CANCELED,result); }
     }
     private void launch() {
         Intent intent=getTargetContext().getPackageManager().getLaunchIntentForPackage(getTargetContext().getPackageName());
