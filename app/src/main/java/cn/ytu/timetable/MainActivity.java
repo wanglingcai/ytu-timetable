@@ -180,6 +180,9 @@ public final class MainActivity extends Activity {
             final String id = schoolId == null ? "" : schoolId.trim();
             runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, PortalImportActivity.class).putExtra(PortalImportActivity.EXTRA_SCHOOL_ID, id), IMPORT_PORTAL));
         }
+        @JavascriptInterface public void importSelfPortal() {
+            runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, SelfPortalActivity.class), IMPORT_PORTAL));
+        }
         @JavascriptInterface public String readState() {
             synchronized (ReminderScheduler.LOCK) {
                 try (InputStream input = stateFile.openRead()) { return new String(readBounded(input, MAX_STATE_BYTES), StandardCharsets.UTF_8); }

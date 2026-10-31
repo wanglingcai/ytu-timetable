@@ -284,6 +284,12 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
         AndroidLocal.importPortal($('portalSchool') ? $('portalSchool').value : 'ytu');
       else toast('官网登录导入需要在安卓应用中使用；浏览器预览可导入已保存的 HTML 课表。');
     };
+    $('selfPortalImport').onclick = () => {
+      closeDialog('importChoice');
+      if (window.AndroidLocal && typeof AndroidLocal.importSelfPortal === 'function')
+        AndroidLocal.importSelfPortal();
+      else toast('自助官网登录导入需要在安卓应用中使用；也可导入 HTML 或 Excel 文件。');
+    };
     if (
       window.AndroidLocal &&
       typeof AndroidLocal.listSchools === 'function' &&
