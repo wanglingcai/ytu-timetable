@@ -4,5 +4,12 @@
     "name": "烟台大学",
     "adapter": "ytu-urp",
     "config": "schools/ytu/config.json"
+  },
+  {
+    "id": "gxu",
+    "name": "广西大学",
+    "adapter": "gxu-zhengfang",
+    "config": "schools/gxu/config.json",
+    "showInSchoolList": false
   }
 ]

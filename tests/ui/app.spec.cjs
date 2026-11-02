@@ -161,6 +161,8 @@ test('非本周灰色显示，单双周同位置都可点击，无课周保留�
     .locator('#fileInput')
     .setInputFiles({ name: '周次显示.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
   await expect(page.locator('#previewList .list-card')).toHaveCount(4);
+  // This scenario checks an empty 20th week, so retain that longer semester explicitly.
+  await page.locator('#importWeeks').fill('20');
   await page.locator('#importStart').fill('2026-08-31');
   await page.locator('#reviewCheck').check();
   await page.locator('#saveImport').click();

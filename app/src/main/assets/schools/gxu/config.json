@@ -1,0 +1,18 @@
+{
+  "id": "gxu",
+  "name": "广西大学",
+  "platform": "zhengfang",
+  "source": "gxu-zhengfang",
+  "entryUrl": "https://jwxt2018.gxu.edu.cn/jwglxt/kbcx/xskbcx_cxXskbcxIndex.html?gnmkdm=N2151",
+  "resultUrl": "https://jwxt2018.gxu.edu.cn/jwglxt/kbcx/xskbcx_cxXskbcxIndex.html",
+  "dataUrl": "https://jwxt2018.gxu.edu.cn/jwglxt/kbcx/xskbcx_cxXsgrkb.html?gnmkdm=N2151",
+  "extractorAsset": "schools/gxu/portal-extract.js",
+  "readMethod": "api_then_dom",
+  "parser": "gxu-zhengfang",
+  "resultHost": "jwxt2018.gxu.edu.cn",
+  "resultPath": "/jwglxt/kbcx/xskbcx_cxXskbcxIndex.html",
+  "allowedHosts": ["jwxt2018.gxu.edu.cn"],
+  "allowedHttpHosts": ["jwxt2018.gxu.edu.cn"],
+  "captchaHosts": [],
+  "statusHint": "请按学校流程登录，进入个人课表查询，选择学年和学期并查询后，再读取课表。官网读取为测试功能，请核对结果。"
+}

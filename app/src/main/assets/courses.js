@@ -1,7 +1,7 @@
 'use strict';
 // Classic script factories also work from Android's offline file URL.
 window.TimetableApp.createCourses = function ({ T, ui, model, persist, courseRow, reminderLabel }) {
-  const { $, DAY, el, append, toast, showDialog, closeDialog } = ui;
+  const { $, DAY, el, append, toast, showDialog, closeDialog, conflictLabel } = ui;
   let editId = null,
     editKind = 'course',
     repeatMode = 'single';
@@ -13,6 +13,28 @@ window.TimetableApp.createCourses = function ({ T, ui, model, persist, courseRow
     const host = $('courseDetail');
     host.replaceChildren();
     host.append(el('h3', 'detail-name', c.name));
+    const conflicts = T.findConflicts(model.state.courses).filter(
+      (conflict) => conflict.a === id || conflict.b === id
+    );
+    if (conflicts.length) {
+      const notice = el('div', 'notice warning course-conflicts');
+      notice.append(el('strong', '', '存在时间冲突，请核对以下安排'));
+      const list = el('ul', 'conflict-list');
+      conflicts.forEach((conflict) => {
+        const row = el('li');
+        const button = el(
+          'button',
+          'conflict-link',
+          conflictLabel(conflict, model.state.courses, model.state.times)
+        );
+        button.type = 'button';
+        button.onclick = () => detail(conflict.a === id ? conflict.b : conflict.a);
+        row.append(button);
+        list.append(row);
+      });
+      notice.append(list);
+      host.append(notice);
+    }
     const rows = [
       [
         '所选周',

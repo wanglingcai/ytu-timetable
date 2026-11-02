@@ -13,7 +13,7 @@ import java.util.Set;
 public final class SchoolConfig {
     public final String id, name, platform, source, entryUrl, resultUrl, dataUrl, extractorAsset, readMethod, parser;
     public final String resultHost, resultPath, statusHint;
-    public final Set<String> allowedHosts, captchaHosts;
+    public final Set<String> allowedHosts, allowedHttpHosts, captchaHosts;
     public final Map<String, Set<Integer>> allowedPorts;
 
     private SchoolConfig(JSONObject json) throws Exception {
@@ -31,18 +31,27 @@ public final class SchoolConfig {
         resultPath = required(json, "resultPath");
         statusHint = json.optString("statusHint", "请先完成学校官网登录，再进入课表页面。");
         allowedHosts = strings(json.optJSONArray("allowedHosts"));
+        allowedHttpHosts = strings(json.optJSONArray("allowedHttpHosts"));
         captchaHosts = strings(json.optJSONArray("captchaHosts"));
         allowedPorts = ports(json.optJSONObject("allowedPorts"));
         if (allowedHosts.isEmpty()) throw new IllegalArgumentException("学校配置缺少 allowedHosts");
-        if (!allowed(entryUrl) || !allowed(resultUrl) || !allowed(dataUrl) || !isResultPage(resultUrl))
-            throw new IllegalArgumentException("学校地址不在 HTTPS 白名单中或课表地址不匹配");
+        if (!allowedHosts.containsAll(allowedHttpHosts)) throw new IllegalArgumentException("HTTP 主机必须同时在学校域名白名单中");
+        if (!allowed(entryUrl) || !allowed(resultUrl) || !allowed(dataUrl) || parseHttps(dataUrl) == null || !isResultPage(resultUrl))
+            throw new IllegalArgumentException("学校地址不在白名单中、课表地址不匹配或课表接口未使用 HTTPS");
     }
 
     public static SchoolConfig fromJson(JSONObject json) throws Exception { return new SchoolConfig(json); }
 
     public boolean allowed(String rawUrl) {
         Uri uri = parseHttps(rawUrl);
-        if (uri == null) return false;
+        if (uri == null) {
+            try {
+                Uri http = Uri.parse(rawUrl);
+                return "http".equalsIgnoreCase(http.getScheme()) && http.getUserInfo() == null && http.getHost() != null
+                    && allowedHttpHosts.contains(http.getHost().toLowerCase(Locale.ROOT))
+                    && (http.getPort() == -1 || http.getPort() == 80);
+            } catch (Exception ignored) { return false; }
+        }
         String host = uri.getHost().toLowerCase(Locale.ROOT);
         if (!allowedHosts.contains(host)) return false;
         int port = uri.getPort();

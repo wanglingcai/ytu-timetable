@@ -1,7 +1,7 @@
 'use strict';
 // Classic script factories also work from Android's offline file URL.
 window.TimetableApp.createImport = function ({ T, ui, model, persist, render, appearance }) {
-  const { $, DAY, el, append, toast, showDialog, closeDialog } = ui;
+  const { $, DAY, el, append, toast, showDialog, closeDialog, conflictLabel } = ui;
   const MAX_BYTES = T.MAX_IMPORT_BYTES;
   const MAX_BACKUP_BYTES = T.MAX_BACKUP_BYTES;
   let preview = null;
@@ -49,14 +49,20 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
     const conflicts = T.findConflicts(preview.courses);
     if (conflicts.length)
       preview.warnings.push(
-        '存在 ' + conflicts.length + ' 组时间重叠；所有课程均保留，导入后可切换列表核对。'
+        '存在 ' + conflicts.length + ' 组时间冲突，所有课程均保留，请核对：',
+        ...conflicts
+          .slice(0, 20)
+          .map((conflict) =>
+            conflictLabel(conflict, preview.courses, (preview.restore || model.state).times)
+          ),
+        ...(conflicts.length > 20 ? ['其余冲突可在保存后点击课程查看。'] : [])
       );
     $('importFileName').textContent = preview.name + ' · ' + preview.format;
     $('importHint').textContent = preview.restore
       ? '保存将用备份替换全部课程、个人安排和学期设置，请先备份当前数据。'
       : '保存会替换学校课程；第一周日期相同则保留个人安排。换学期时会确认移除原学期安排。请核对日期和节次时间。';
     $('importSummary').replaceChildren();
-    const maxWeek = Math.max(...preview.courses.flatMap((c) => c.weeks));
+    const maxWeek = Math.max(...[].concat(...preview.courses.map((c) => c.weeks)));
     for (const [value, label] of [
       [preview.courses.length, '上课安排'],
       [new Set(preview.courses.map((c) => c.name)).size, '课程名称'],
@@ -78,8 +84,42 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
       : model.state.courses.length
         ? model.state.semester
         : preview.name.replace(/\.[^.]+$/, '');
-    $('importStart').value = base.startDate;
-    $('importWeeks').value = Math.max(base.totalWeeks, maxWeek);
+    const previousCourses = model.state.courses.length > 0;
+    const semester = preview.semester || {};
+    let detectedStart = '';
+    try {
+      if (semester.startDate && T.parseDate(semester.startDate).getDay() === 1)
+        detectedStart = semester.startDate;
+    } catch (error) {
+      // Ignore malformed portal metadata and ask for a date instead.
+    }
+    if (preview.restore) {
+      $('importStart').value = base.startDate;
+      $('importDateSuggestion').textContent = '日期来自备份，请确认。';
+      $('importWeeks').value = base.totalWeeks;
+      $('importWeeksSuggestion').textContent = '学期总周数来自备份，请确认。';
+    } else {
+      $('importStart').value = detectedStart || (previousCourses ? model.state.startDate : '');
+      $('importDateSuggestion').textContent = semester.conflict
+        ? '来源中的学期日期存在冲突，请核对学校校历并填写第一周周一。'
+        : detectedStart
+          ? '已根据' +
+            (semester.source === '页面当前日期和当前教学周'
+              ? semester.source
+              : '来源中的学期开始日期') +
+            '建议日期，请对照校历确认。'
+          : previousCourses
+            ? '未识别到学期日期，已保留当前课表设置；如为新学期请修改。'
+            : '未识别到第一周日期，请查看学校校历后填写。';
+      if (semester.conflict) $('importStart').value = '';
+      $('importWeeks').value = previousCourses
+        ? Math.max(model.state.totalWeeks, maxWeek)
+        : maxWeek;
+      $('importWeeksSuggestion').textContent =
+        previousCourses && model.state.totalWeeks >= maxWeek
+          ? '已保留当前学期总周数；本次课表最晚上到第 ' + maxWeek + ' 周，请确认。'
+          : '根据已识别课程，建议至少 ' + maxWeek + ' 周；学期总周数可能更长，请确认。';
+    }
     $('reviewCheck').checked = false;
     const list = $('previewList');
     list.replaceChildren();
@@ -164,6 +204,10 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
     if (!preview) return;
     if (!$('reviewCheck').checked) {
       toast('请先核对课程，并勾选确认后保存');
+      return;
+    }
+    if (!$('importStart').value) {
+      toast('请先确认并填写第一周周一的日期');
       return;
     }
     const base = preview.restore || model.state;
@@ -253,6 +297,8 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
             ' 个课程卡片，但未能解析上课安排（COURSE_PARSE）。原课表未修改。' +
             preview.warnings.slice(0, 2).join(' ')
         );
+      if (payload.semester && typeof payload.semester === 'object')
+        preview.semester = payload.semester;
       if (Array.isArray(payload.warnings))
         preview.warnings.push(
           ...payload.warnings
@@ -283,6 +329,12 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
       if (window.AndroidLocal && typeof AndroidLocal.importPortal === 'function')
         AndroidLocal.importPortal($('portalSchool') ? $('portalSchool').value : 'ytu');
       else toast('官网登录导入需要在安卓应用中使用；浏览器预览可导入已保存的 HTML 课表。');
+    };
+    $('selfPortalImport').onclick = () => {
+      closeDialog('importChoice');
+      if (window.AndroidLocal && typeof AndroidLocal.importSelfPortal === 'function')
+        AndroidLocal.importSelfPortal();
+      else toast('自助官网登录导入需要在安卓应用中使用；也可导入 HTML 或 Excel 文件。');
     };
     if (
       window.AndroidLocal &&

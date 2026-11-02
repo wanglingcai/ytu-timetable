@@ -202,3 +202,20 @@ test('当前时间线在上课中按比例定位，课间置于下一节边界�
   assert.deepEqual(T.timePosition(times,new Date(2026,9,21,8,50)),{section:1,fraction:0});
   assert.equal(T.timePosition(times,new Date(2026,9,21,7,50)),null);assert.equal(T.timePosition(times,new Date(2026,9,21,9,40)),null);
 });
+
+test('非本周显示偏好可校验和备份，关闭仅影响当前视图，不改动课程',()=>{
+ const courses=[makeCourse({id:'active',weeks:[1]}),makeCourse({id:'inactive',weeks:[2]}),makeCourse({id:'plan',kind:'personal',weeks:[2]})];
+ const original=JSON.stringify(courses);
+ assert.deepEqual(T.coursesForWeekView(courses,1,false).map(c=>c.id),['active']);
+ assert.equal(JSON.stringify(courses),original);
+ const state={...T.defaultState(),courses,showInactiveCourses:false};
+ assert.equal(T.validateState(JSON.parse(JSON.stringify(state))).showInactiveCourses,false);
+ delete state.showInactiveCourses;assert.equal(T.validateState(state).showInactiveCourses,true);
+ for(const invalid of ['false',0,null])assert.throws(()=>T.validateState({...state,showInactiveCourses:invalid}));
+});
+test('冲突结果精确指出共同周次与交叠节次，不误报不同周次的同位置课程',()=>{
+ const a=makeCourse({id:'a',day:3,start:1,end:3,weeks:[2,5]});
+ const b=makeCourse({id:'b',day:3,start:3,end:4,weeks:[5]});
+ const c=makeCourse({id:'c',day:3,start:3,end:4,weeks:[6]});
+ assert.deepEqual(T.findConflicts([a,b,c]),[{a:'a',b:'b',day:3,start:3,end:3,weeks:[5]}]);
+});

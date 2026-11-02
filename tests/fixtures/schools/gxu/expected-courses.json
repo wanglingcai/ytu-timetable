@@ -1,0 +1,5 @@
+[
+ {"name":"模拟课程甲","teacher":"教师甲","room":"A101","day":1,"start":1,"end":2,"weeks":[1,2,3,4,6,7,8,9,10,11,12]},
+ {"name":"模拟课程乙","teacher":"教师乙","room":"B202","day":1,"start":1,"end":2,"weeks":[3,5,6,7,8,9]},
+ {"name":"模拟课程丙","teacher":"教师丙","room":"C303","day":2,"start":3,"end":4,"weeks":[8,10]}
+]

@@ -4,11 +4,12 @@ window.TimetableApp.createTimetableView = function ({
   T,
   ui,
   model,
+  persist,
   detail,
   openEdit,
   openReminder
 }) {
-  const { $, DAY, el, append, courseTitle } = ui;
+  const { $, DAY, el, append, courseTitle, conflictLabel } = ui;
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   let entranceAnimations = [];
   const stopMotion = () => {
@@ -94,16 +95,57 @@ window.TimetableApp.createTimetableView = function ({
     }
     const active = activeCourses(),
       conflicts = T.findConflicts(active),
-      displayed = T.coursesForWeekView(model.state.courses, model.week);
+      displayed = T.coursesForWeekView(
+        model.state.courses,
+        model.week,
+        model.state.showInactiveCourses
+      );
     $('scheduleHeading').textContent =
       (model.week === current ? '本周安排' : '第 ' + model.week + ' 周安排') +
       ' · ' +
       active.length +
       ' 项';
-    $('inactiveCount').textContent = '非本周 ' + (displayed.length - active.length) + ' 项';
+    const inactiveCount = model.state.courses.filter(
+      (course) => course.kind !== 'personal' && !course.weeks.includes(model.week)
+    ).length;
+    $('inactiveCount').textContent = '非本周 ' + inactiveCount + ' 项';
+    $('toggleInactive').textContent = model.state.showInactiveCourses ? '隐藏' : '显示';
+    $('toggleInactive').setAttribute('aria-pressed', String(model.state.showInactiveCourses));
+    $('toggleInactive').setAttribute(
+      'aria-label',
+      (model.state.showInactiveCourses ? '隐藏' : '显示') + '非本周课程'
+    );
+    $('scheduleHint').textContent =
+      '左右滑动切换周次 · 点击空白格添加个人安排' +
+      (model.state.showInactiveCourses ? ' · 灰色为非本周课程' : ' · 已隐藏非本周课程');
     $('conflictNotice').hidden = !conflicts.length;
-    $('conflictNotice').textContent =
-      '有 ' + conflicts.length + ' 组课程或安排时间重叠，均已保留。请点击“切换列表”逐一核对。';
+    $('conflictNotice').replaceChildren();
+    if (conflicts.length) {
+      $('conflictNotice').append(
+        el('strong', '', '第 ' + model.week + ' 周有 ' + conflicts.length + ' 组时间冲突')
+      );
+      const list = el('ul', 'conflict-list');
+      conflicts.slice(0, 100).forEach((conflict) => {
+        const row = el('li');
+        const button = el(
+          'button',
+          'conflict-link',
+          conflictLabel(
+            conflict,
+            model.state.courses,
+            model.state.times,
+            model.state.startDate,
+            model.week
+          )
+        );
+        button.type = 'button';
+        button.onclick = () => detail(conflict.a);
+        row.append(button);
+        list.append(row);
+      });
+      if (conflicts.length > 100) list.append(el('li', '', '其余冲突请在课程详情中核对。'));
+      $('conflictNotice').append(list);
+    }
     $('noWeekCourses').hidden = active.length > 0;
     $('noWeekLabel').textContent = displayed.length
       ? '这一周没有安排，灰色卡片可查看其他周课程。'
@@ -112,7 +154,7 @@ window.TimetableApp.createTimetableView = function ({
     $('listView').hidden = !model.listMode;
     $('viewToggle').textContent = model.listMode ? '切换周视图' : '切换列表';
     renderGrid(displayed, dates, conflicts);
-    renderList(displayed, dates);
+    renderList(displayed, dates, conflicts);
     updateTimeCues();
   }
   function updateTimeCues() {
@@ -259,12 +301,13 @@ window.TimetableApp.createTimetableView = function ({
       const position = positions.get(c.id),
         { lane: index, count } = position;
       const inactive = !c.isActive;
+      const hasConflict = !inactive && conflicts.some((x) => x.a === c.id || x.b === c.id);
       const card = el(
         'button',
         'course-card palette-' +
           T.coursePalette(c) +
           (inactive ? ' inactive' : '') +
-          (conflicts.some((x) => x.a === c.id || x.b === c.id) ? ' conflict' : '')
+          (hasConflict ? ' conflict' : '')
       );
       if (c.start === c.end) card.classList.add('single-section');
       card.type = 'button';
@@ -297,7 +340,10 @@ window.TimetableApp.createTimetableView = function ({
         card.style.marginLeft = 'calc(' + (100 * index) / count + '% + 1px)';
       }
       if (inactive) card.append(el('span', 'course-status', '非本周'));
+      else if (hasConflict) card.append(el('span', 'course-status conflict-label', '时间冲突'));
       else if (c.kind === 'personal') card.append(el('span', 'course-status', '个人'));
+      if (hasConflict)
+        card.setAttribute('aria-label', card.getAttribute('aria-label') + '，时间冲突');
       append(card, el('strong', '', courseTitle(c)), el('small', '', c.room || '地点待定'));
       card.addEventListener('click', () => detail(c.id));
       if (position.stackKey) {
@@ -354,7 +400,7 @@ window.TimetableApp.createTimetableView = function ({
       item.title.style.visibility = item.hideTitle ? 'hidden' : '';
     });
   }
-  function courseRow(c, withWeeks = false) {
+  function courseRow(c, withWeeks = false, conflicts = []) {
     const inactive = !c.weeks.includes(model.week);
     const button = el('button', 'list-card' + (inactive ? ' inactive' : ''));
     button.type = 'button';
@@ -380,13 +426,17 @@ window.TimetableApp.createTimetableView = function ({
           '非本周 · ' + T.formatWeeks(c.weeks) + (c.kind === 'personal' ? ' 周安排' : ' 周上课')
         )
       );
-    else if (withWeeks && c.kind !== 'personal')
+    if (!inactive && conflicts.some((conflict) => conflict.a === c.id || conflict.b === c.id)) {
+      button.classList.add('conflict');
+      info.append(el('p', 'conflict-label', '时间冲突，点击查看详情'));
+    }
+    if (!inactive && withWeeks && c.kind !== 'personal')
       info.append(el('p', '', T.formatWeeks(c.weeks) + ' 周'));
     append(button, chip, info, el('span', 'arrow', '›'));
     button.addEventListener('click', () => detail(c.id));
     return button;
   }
-  function renderList(active, dates) {
+  function renderList(active, dates, conflicts) {
     const list = $('listView');
     list.replaceChildren();
     for (let day = 1; day <= 7; day++) {
@@ -394,7 +444,7 @@ window.TimetableApp.createTimetableView = function ({
       if (!courses.length) continue;
       const group = el('div', 'day-list');
       group.append(el('h3', '', DAY[day] + ' · ' + dates[day - 1]));
-      courses.forEach((c) => group.append(courseRow(c)));
+      courses.forEach((c) => group.append(courseRow(c, false, conflicts)));
       list.append(group);
     }
   }
@@ -405,6 +455,8 @@ window.TimetableApp.createTimetableView = function ({
     );
   }
   function bindEvents() {
+    $('toggleInactive').onclick = () =>
+      persist({ ...model.state, showInactiveCourses: !model.state.showInactiveCourses });
     window.addEventListener('resize', sizeViewport);
     if (window.visualViewport) window.visualViewport.addEventListener('resize', sizeViewport);
     sizeViewport();

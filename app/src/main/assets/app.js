@@ -5,6 +5,12 @@
   const factories = window.TimetableApp;
   const ui = factories.createUI();
   const { $, toast, showDialog } = ui;
+  if (window.AndroidLocal && typeof AndroidLocal.appVersion === 'function') {
+    try {
+      const version = AndroidLocal.appVersion();
+      if (version) $('appVersion').textContent = 'v' + version;
+    } catch (ignored) {}
+  }
   const KEY = 'ytu-timetable-v1';
   // Only model.state is persisted. Navigation/rendering fields never enter backups.
   const model = {
@@ -62,6 +68,7 @@
     T,
     ui,
     model,
+    persist,
     detail: (id) => courses.detail(id),
     openEdit: (...args) => courses.openEdit(...args),
     openReminder: (payload) => settings.openReminder(payload)

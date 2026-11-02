@@ -24,9 +24,17 @@ public final class SmokeInstrumentation extends Instrumentation {
     private boolean verifyExisting;
     private String reminderMode;
     private boolean adapterMode;
+    private boolean selfPortalMode;
+    private boolean selfPortalAdapters;
+    private boolean scheduleMode;
+    private boolean gxuLoginMode;
     private final StringBuilder report = new StringBuilder();
-    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); start(); }
+    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); selfPortalMode=args!=null && "true".equals(args.getString("selfPortal")); selfPortalAdapters=args!=null && "true".equals(args.getString("selfPortalAdapters")); scheduleMode=args!=null && "true".equals(args.getString("schedule")); gxuLoginMode=args!=null && "true".equals(args.getString("gxuLogin")); start(); }
     @Override public void onStart() {
+        if(gxuLoginMode){new GxuLoginChecks(this).run();return;}
+        if(scheduleMode){checkSchedule();return;}
+        if(selfPortalAdapters){new SelfPortalAdapterChecks(this).run();return;}
+        if(selfPortalMode){checkSelfPortal();return;}
         if(adapterMode){new AdapterChecks(this).run();return;}
         if(reminderMode!=null){new ReminderChecks(this).run(reminderMode);return;}
         Bundle result = new Bundle();
@@ -207,6 +215,71 @@ public final class SmokeInstrumentation extends Instrumentation {
         checks++;report.append("✓ 恢复默认删除私有图片并重置遮罩与模糊\n");
         check("AndroidLocal.readState()==="+timetable,"选图失败和恢复默认后课程与个人安排完整保留");
         js("document.querySelector('#settingsDialog').close();document.querySelector('#weekSelect').value='3';document.querySelector('#weekSelect').dispatchEvent(new Event('change'));true");
+    }
+    @SuppressWarnings("unchecked")
+    private void checkSelfPortal() {
+        Bundle result = new Bundle();
+        try {
+            launch(); await("document.readyState==='complete' && !!window.receivePortalImport");
+            String before=js("AndroidLocal.readState()");
+            Activity offline=activity;
+            ActivityMonitor monitor=addMonitor(SelfPortalActivity.class.getName(),null,false);
+            js("document.querySelector('#importButton').click();document.querySelector('#selfPortalImport').click();true");
+            Activity self=waitForMonitorWithTimeout(monitor,10000);
+            if(self==null)throw new AssertionError("自助导入窗口未打开");
+            java.lang.reflect.Method origin=SelfPortalActivity.class.getDeclaredMethod("origin",String.class); origin.setAccessible(true);
+            if(!"http://example.edu:8080".equals(origin.invoke(null,"http://example.edu:8080/course"))
+                || !"https://example.edu".equals(origin.invoke(null,"https://example.edu:443/course"))
+                || origin.invoke(null,"ftp://example.edu/")!=null || origin.invoke(null,"http://name@example.edu/")!=null
+                || !android.security.NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted()) throw new AssertionError("HTTP URL policy");
+            checks++; report.append("✓ 自助导入允许 HTTP 和非默认端口，区分 HTTPS 并拒绝非网页协议\n");
+            java.lang.reflect.Field origins=SelfPortalActivity.class.getDeclaredField("allowedOrigins"); origins.setAccessible(true);
+            ((java.util.Set<String>)origins.get(self)).add("https://fixture.test");
+            java.lang.reflect.Field field=SelfPortalActivity.class.getDeclaredField("portal"); field.setAccessible(true); WebView web=(WebView)field.get(self);
+            String html="<table id='kbgrid_table_0'><tr><td colspan='9'>模拟学期</td></tr><tr><td>时间段</td><td>节次</td><td>星期一</td><td>星期二</td><td>星期三</td><td>星期四</td><td>星期五</td><td>星期六</td><td>星期日</td></tr><tr><td rowspan='2'>上午</td><td>1</td><td rowspan='2'><div class='timetable_con'><span class='title'>模拟数学○</span><p><span title='节/周'></span><font>(1-2节)1-16周</font></p><p><span title='上课地点'></span><font>* A101</font></p><p><span title='教师 '></span><font>教师甲</font></p></div></td><td></td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>2</td><td></td><td></td><td></td><td></td><td></td><td></td></tr></table>";
+            runOnMainSync(()->{web.setWebViewClient(new android.webkit.WebViewClient(){@Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view,android.webkit.WebResourceRequest request){return new android.webkit.WebResourceResponse("text/html","UTF-8",new java.io.ByteArrayInputStream(html.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}}); web.loadUrl("https://fixture.test/");});
+            long until=System.currentTimeMillis()+10000;
+            AtomicReference<Integer> progress=new AtomicReference<>(0);
+            while(System.currentTimeMillis()<until){runOnMainSync(()->progress.set(web.getUrl()!=null && web.getUrl().startsWith("https://fixture.test/") ? web.getProgress() : 0));if(progress.get()==100)break;Thread.sleep(100);}
+            CountDownLatch compatLatch = new CountDownLatch(1);
+            runOnMainSync(()->web.evaluateJavascript("String.prototype.matchAll=undefined;Array.prototype.flatMap=undefined;true",reply->compatLatch.countDown()));
+            if(!compatLatch.await(10,TimeUnit.SECONDS))throw new AssertionError("兼容环境设置超时");
+            waitForIdleSync();
+            java.lang.reflect.Field readField=SelfPortalActivity.class.getDeclaredField("read"); readField.setAccessible(true); Button button=(Button)readField.get(self); runOnMainSync(()->button.setEnabled(true));
+            AtomicReference<Boolean> enabled=new AtomicReference<>(false);
+            until=System.currentTimeMillis()+10000; while(System.currentTimeMillis()<until){runOnMainSync(()->enabled.set(button.isEnabled()));if(enabled.get())break;Thread.sleep(100);}
+            if(!enabled.get())throw new AssertionError("课表页面未能读取");
+            runOnMainSync(button::performClick); activity=offline;
+            await("document.querySelector('#importDialog').open");
+            check("document.querySelector('#previewList').textContent.includes('模拟数学') && document.querySelector('#previewList').textContent.includes('A101')", "旧版 WebView 兼容环境下正方课表进入预览");
+            check("AndroidLocal.readState()==="+before, "预览确认前原课表未修改");
+            js("document.querySelector('#cancelImport').click();true");
+            check("AndroidLocal.readState()==="+before, "取消预览保留原课表");
+            result.putString("stream", "\nPASS: " + checks + " self portal checks\n" + report); finish(Activity.RESULT_OK,result);
+        } catch (Throwable error) { result.putString("stream", "\nFAIL: " + error + "\n" + android.util.Log.getStackTraceString(error)); finish(Activity.RESULT_CANCELED,result); }
+    }
+    private void checkSchedule() {
+        Bundle result=new Bundle();String original=null;
+        try {
+            launch();await("document.readyState==='complete' && !!window.Timetable");
+            original=js("AndroidLocal.readState()");
+            js("(function(){var a=Timetable.validateCourse({id:'conflict-a',name:'模拟数学',day:1,start:1,end:2,weeks:[1]});var b=Timetable.validateCourse({id:'conflict-b',name:'模拟英语',day:1,start:2,end:3,weeks:[1]});var c=Timetable.validateCourse({id:'later',name:'其他周课程',day:3,start:5,end:6,weeks:[2]});return AndroidLocal.saveState(JSON.stringify({...Timetable.defaultState(),reminders:{courseMinutes:-1},courses:[a,b,c]}));})()");
+            runOnMainSync(()->activity.finish());waitForIdleSync();launch();
+            await("document.readyState==='complete' && document.querySelectorAll('.course-card').length===3 && document.querySelector('#scheduleGrid').textContent.includes('模拟英语')");
+            check("document.querySelector('#conflictNotice').textContent.includes('星期一 第 2 节（08:55–09:40）：模拟数学 与 模拟英语')", "冲突提示具体指出双方课程和重叠节次、时间");
+            check("document.querySelectorAll('.course-card.conflict').length===2", "两门冲突课程均保留并标记");
+            tapElement("#toggleInactive");await("document.querySelectorAll('.course-card').length===2");
+            check("JSON.parse(AndroidLocal.readState()).showInactiveCourses===false && JSON.parse(AndroidLocal.readState()).courses.length===3", "图例小按钮立即保存隐藏偏好且课程数据仍完整");
+            runOnMainSync(()->activity.finish());waitForIdleSync();launch();await("document.readyState==='complete' && document.querySelectorAll('.course-card').length===2");
+            check("document.querySelector('#toggleInactive').getAttribute('aria-pressed')==='false'", "重建安卓 Activity 后保持隐藏非本周课程");
+            tapElement("#toggleInactive");await("document.querySelectorAll('.course-card').length===3");
+            check("JSON.parse(AndroidLocal.readState()).showInactiveCourses===true", "重新开启后显示其他周课程");
+            result.putString("stream","\nPASS: "+checks+" schedule checks\n"+report);finish(Activity.RESULT_OK,result);
+        } catch(Throwable error){result.putString("stream","\nFAIL: "+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result);}
+        finally {
+            try{if(original!=null)js("(function(){var old="+original+";return AndroidLocal.saveState(old||JSON.stringify(Timetable.defaultState()));})()");}catch(Exception ignored){}
+            if(activity!=null)runOnMainSync(()->activity.finish());
+        }
     }
     private void launch() {
         Intent intent=getTargetContext().getPackageManager().getLaunchIntentForPackage(getTargetContext().getPackageName());

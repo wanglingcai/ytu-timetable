@@ -1,0 +1,9 @@
+{
+  "xsxx": {"XH":"FAKE-PRIVATE-ACCOUNT","XM":"FAKE-PRIVATE-NAME"},
+  "kbList": [
+    {"kcmc":"模拟课程甲","xqj":"1","jcs":"1-2","zcd":"1-4周,6-12周","xm":"教师甲","cdmc":"A101","private":"FAKE-PRIVATE-CLASS"},
+    {"kcmc":"模拟课程乙","xqj":"1","jcs":"1-2","zcd":"3-5周(单),6-9周","xm":"教师乙","cdmc":"B202"},
+    {"kcmc":"模拟课程丙","xqj":"2","jcs":"3-4","zcd":"8-10周(双)","xm":"教师丙","cdmc":"C303"},
+    {"kcmc":"未安排时间的模拟课程","xqj":"0","jcs":"","zcd":""}
+  ]
+}

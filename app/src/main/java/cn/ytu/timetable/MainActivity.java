@@ -176,9 +176,16 @@ public final class MainActivity extends Activity {
             try { return PortalImportCoordinator.load(MainActivity.this).schools().toString(); }
             catch (Exception failed) { return "[]"; }
         }
+        @JavascriptInterface public String appVersion() {
+            try { return getPackageManager().getPackageInfo(getPackageName(),0).versionName; }
+            catch (Exception ignored) { return ""; }
+        }
         @JavascriptInterface public void importPortal(String schoolId) {
             final String id = schoolId == null ? "" : schoolId.trim();
             runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, PortalImportActivity.class).putExtra(PortalImportActivity.EXTRA_SCHOOL_ID, id), IMPORT_PORTAL));
+        }
+        @JavascriptInterface public void importSelfPortal() {
+            runOnUiThread(() -> startActivityForResult(new Intent(MainActivity.this, SelfPortalActivity.class), IMPORT_PORTAL));
         }
         @JavascriptInterface public String readState() {
             synchronized (ReminderScheduler.LOCK) {

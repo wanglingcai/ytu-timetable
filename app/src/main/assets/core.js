@@ -100,11 +100,12 @@
 
   function weekMatches(value) {
     const s = normalized(value).replace(/(\d)\s*\((单|双)(?:周)?\)\s*周/g, '$1周$2');
-    return Array.from(
-      s.matchAll(
-        /(?:第\s*)?\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*\s*周(?:\s*\(?[单双](?:周)?\)?)?/g
-      )
-    );
+    const pattern =
+      /(?:第\s*)?\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*\s*周(?:\s*\(?[单双](?:周)?\)?)?/g;
+    const matches = [];
+    let match;
+    while ((match = pattern.exec(s))) matches.push(match);
+    return matches;
   }
 
   function validateCourse(raw, index = 0) {
@@ -398,12 +399,257 @@
     return { courses: deduplicate(courses, warnings), warnings, format: '周课表网格' };
   }
 
+  // Only accept explicitly labelled dates; ambiguous or conflicting sources are never guessed.
+  function inferSemester(chunks, today = new Date()) {
+    const source = (Array.isArray(chunks) ? chunks : [chunks])
+      .filter((item) => typeof item === 'string')
+      .map((item) => item.slice(0, 100000))
+      .join('\n');
+    const datePattern =
+      '(\\d{4})\\s*(?:年|[-/.])\\s*(\\d{1,2})\\s*(?:月|[-/.])\\s*(\\d{1,2})\\s*日?';
+    const toDate = (match) => {
+      try {
+        return parseDate(
+          match[1] + '-' + match[2].padStart(2, '0') + '-' + match[3].padStart(2, '0')
+        );
+      } catch (error) {
+        return null;
+      }
+    };
+    const dates = [];
+    const labelled = new RegExp(
+      '(?:第一(?:教学)?周(?:周一|星期一|开始日期|起始日期)?|学期开始日期|学期开始时间|开学日期|开学时间)\\s*[：:]?\\s*' +
+        datePattern,
+      'g'
+    );
+    let match;
+    while ((match = labelled.exec(source))) {
+      const date = toDate(match);
+      if (date && /(?:周一|星期一)/.test(match[0]) && date.getDay() !== 1)
+        return { conflict: true };
+      if (date) dates.push(dateString(mondayOf(date)));
+    }
+    const direct = Array.from(new Set(dates));
+    if (direct.length > 1) return { conflict: true };
+
+    // A separately labelled "current date" must match today, so saved old pages cannot silently shift a semester.
+    const weekMatches = [];
+    const currentWeekPattern =
+      /(?:当前教学周|当前周次|本教学周|本周周次)\s*[：:]?\s*(?:第\s*)?(\d{1,2})\s*周?/g;
+    while ((match = currentWeekPattern.exec(source))) weekMatches.push(Number(match[1]));
+    const currentDates = [];
+    const currentDatePattern = new RegExp(
+      '(?:当前日期|今天日期|今日日期)\\s*[：:]?\\s*' + datePattern,
+      'g'
+    );
+    while ((match = currentDatePattern.exec(source))) {
+      const date = toDate(match);
+      if (date) currentDates.push(dateString(date));
+    }
+    const weeks = Array.from(new Set(weekMatches));
+    const days = Array.from(new Set(currentDates));
+    let calculated = '';
+    if (
+      weeks.length === 1 &&
+      weeks[0] >= 1 &&
+      weeks[0] <= 60 &&
+      days.length === 1 &&
+      days[0] === dateString(today)
+    ) {
+      const monday = mondayOf(parseDate(days[0]));
+      monday.setDate(monday.getDate() - (weeks[0] - 1) * 7);
+      calculated = dateString(monday);
+    }
+    if (direct.length && calculated && direct[0] !== calculated) return { conflict: true };
+    if (direct.length) return { startDate: direct[0], source: '来源明确的学期开始日期' };
+    if (calculated) return { startDate: calculated, source: '页面当前日期和当前教学周' };
+    return {};
+  }
+
+  // Zhengfang timetable cards carry explicit section/week fields and must not include hidden teaching-class details.
+  function parseZhengfangDocument(doc) {
+    const tables = Array.from(doc.querySelectorAll('table[id^="kbgrid_table"]'));
+    const listTables = Array.from(doc.querySelectorAll('table[id^="kblist_table"]'));
+    if (!tables.length && !listTables.length) return null;
+    const courses = [],
+      warnings = [];
+    let cardCount = 0;
+    for (const table of tables) {
+      const rows = [],
+        header = Array.from(table.rows).findIndex(
+          (row) =>
+            Array.from(row.cells).filter((cell) =>
+              /星期[一二三四五六日天]/.test(text(cell.textContent))
+            ).length >= 3
+        );
+      if (header < 0 || table.rows.length > 100) continue;
+      const days = {};
+      for (let r = 0; r < table.rows.length; r++) {
+        rows[r] = rows[r] || [];
+        let col = 0;
+        for (const cell of Array.from(table.rows[r].cells)) {
+          while (rows[r][col] !== undefined) col++;
+          const rs = cell.rowSpan || 1,
+            cs = cell.colSpan || 1;
+          if (r + rs > 100 || col + cs > 32) throw new Error('课表网格过大');
+          for (let y = r; y < r + rs; y++) {
+            rows[y] = rows[y] || [];
+            for (let x = col; x < col + cs; x++) rows[y][x] = cell;
+          }
+          if (r === header) {
+            const day = parseDay(cell.textContent);
+            if (day && /星期|周|礼拜/.test(cell.textContent)) days[col] = day;
+          } else if (r > header && days[col]) {
+            for (const card of Array.from(cell.querySelectorAll('.timetable_con'))) {
+              cardCount++;
+              try {
+                const title = card.querySelector('.title');
+                const field = (label) => {
+                  const paragraph = Array.from(card.querySelectorAll('p')).find((node) => {
+                    const span = node.querySelector('span[title]');
+                    return span && span.getAttribute('title').trim() === label;
+                  });
+                  if (!paragraph) return '';
+                  const fonts = Array.from(paragraph.children).filter(
+                    (node) => node.tagName === 'FONT'
+                  );
+                  return fonts
+                    .map((node) => text(node.textContent))
+                    .join(' ')
+                    .replace(/^\*\s*/, '')
+                    .trim();
+                };
+                const name = title
+                  ? text(title.textContent)
+                      .replace(/[○◯●]+\s*$/, '')
+                      .trim()
+                  : '';
+                const schedule = normalized(field('节/周'));
+                const sections = parseSections(schedule);
+                const weekPart = schedule.replace(
+                  /^\s*[（(]?\s*\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:小)?节\s*[)）]?/,
+                  ''
+                );
+                const pieces = weekMatches(weekPart).map((match) => match[0]);
+                const weeks = Array.from(
+                  new Set([].concat(...pieces.map((part) => parseWeeks(part))))
+                ).sort((a, b) => a - b);
+                courses.push(
+                  validateCourse(
+                    {
+                      name,
+                      teacher: field('教师'),
+                      room: field('上课地点'),
+                      day: days[col],
+                      ...sections,
+                      weeks
+                    },
+                    courses.length
+                  )
+                );
+              } catch (error) {
+                warnings.push('有一条课程卡片缺少有效的名称、节次或周次，未导入，请核对原课表。');
+              }
+            }
+          }
+          col += cs;
+        }
+      }
+    }
+    const listCourses = [],
+      listWarnings = [];
+    let listCardCount = 0;
+    for (const table of listTables) {
+      if (table.rows.length > 200) continue;
+      const matrix = [];
+      let dayColumn = -1,
+        sectionColumn = -1;
+      for (let r = 0; r < table.rows.length; r++) {
+        matrix[r] = matrix[r] || [];
+        let col = 0;
+        for (const cell of Array.from(table.rows[r].cells)) {
+          while (matrix[r][col] !== undefined) col++;
+          const rs = cell.rowSpan || 1,
+            cs = cell.colSpan || 1;
+          if (r + rs > 200 || col + cs > 32) throw new Error('课表网格过大');
+          for (let y = r; y < r + rs; y++) {
+            matrix[y] = matrix[y] || [];
+            for (let x = col; x < col + cs; x++) matrix[y][x] = cell;
+          }
+          const label = text(cell.textContent).replace(/\s/g, '');
+          if (/^(星期|星期几|周几)$/.test(label)) dayColumn = col;
+          if (/^(节次|上课节次)$/.test(label)) sectionColumn = col;
+          if (dayColumn >= 0 && sectionColumn >= 0) {
+            for (const card of Array.from(cell.querySelectorAll('.timetable_con'))) {
+              listCardCount++;
+              try {
+                const title = card.querySelector('.title');
+                const fields = Array.from(card.querySelectorAll('p > font')).map((font) =>
+                  normalized(font.textContent)
+                );
+                const field = (pattern) => {
+                  for (const value of fields) {
+                    const match = value.match(pattern);
+                    if (match) return match[1].trim();
+                  }
+                  return '';
+                };
+                const weekText = field(/^周(?:数|次)\s*[：:]\s*(.*)$/);
+                const pieces = weekMatches(weekText).map((match) => parseWeeks(match[0]));
+                listCourses.push(
+                  validateCourse(
+                    {
+                      name: title
+                        ? text(title.textContent)
+                            .replace(/[○◯●]+\s*$/, '')
+                            .trim()
+                        : '',
+                      teacher: field(/^(?:任课)?教师\s*[：:]\s*(.*)$/),
+                      room: field(/(?:场地|上课地点|教室)\s*[：:]\s*(.*)$/),
+                      day: parseDay(matrix[r][dayColumn] && matrix[r][dayColumn].textContent),
+                      ...parseSections(
+                        matrix[r][sectionColumn] && matrix[r][sectionColumn].textContent
+                      ),
+                      weeks: Array.from(new Set([].concat(...pieces))).sort((a, b) => a - b)
+                    },
+                    listCourses.length
+                  )
+                );
+              } catch (error) {
+                listWarnings.push(
+                  '有一条列表课程缺少有效的名称、星期、节次或周次，未导入，请核对原课表。'
+                );
+              }
+            }
+          }
+          col += cs;
+        }
+      }
+    }
+    const gridResult = {
+      courses: deduplicate(courses, warnings),
+      warnings,
+      cardCount,
+      format: '正方教务课表'
+    };
+    const listResult = {
+      courses: deduplicate(listCourses, listWarnings),
+      warnings: listWarnings,
+      cardCount: listCardCount,
+      format: '正方教务列表课表'
+    };
+    return listResult.courses.length > gridResult.courses.length || (!cardCount && listCardCount)
+      ? listResult
+      : gridResult;
+  }
+
   function parseWorkbook(workbook, XLSX) {
     if (!workbook || !workbook.SheetNames || workbook.SheetNames.length > 50)
       throw new Error('工作簿无效或工作表过多');
     const courses = [],
       warnings = [],
-      formats = [];
+      formats = [],
+      semesterText = [];
     for (const name of workbook.SheetNames) {
       const sheet = workbook.Sheets[name];
       if (!sheet || !sheet['!ref']) continue;
@@ -420,6 +666,7 @@
           blankrows: true,
           range: { s: { r: 0, c: 0 }, e: range.e }
         });
+        semesterText.push(...rows.slice(0, 50).map((row) => row.slice(0, 32).join(' ')));
         const result = parseMatrix(rows, sheet['!merges'] || [], name);
         courses.push(...result.courses);
         warnings.push(...result.warnings);
@@ -430,7 +677,12 @@
     }
     const unique = deduplicate(courses, warnings);
     if (!unique.length) throw new Error('没有解析到有效课程。' + warnings.slice(0, 3).join(' '));
-    return { courses: unique, warnings, format: Array.from(new Set(formats)).join(' / ') };
+    return {
+      courses: unique,
+      warnings,
+      format: Array.from(new Set(formats)).join(' / '),
+      semester: inferSemester(semesterText)
+    };
   }
 
   function readImport(bytes, name, XLSX) {
@@ -462,8 +714,26 @@
     const head = new TextDecoder().decode(bytes.slice(0, 200));
     const isText = ['csv', 'tsv', 'html', 'htm'].includes(ext) || /^\s*(?:\uFEFF)?</.test(head);
     let input = isText ? decode() : bytes;
+    if (isText && typeof DOMParser !== 'undefined' && /<(?:html|table)\b/i.test(input)) {
+      const doc = new DOMParser().parseFromString(input, 'text/html');
+      const result = parseZhengfangDocument(doc);
+      if (result && result.cardCount) {
+        if (!result.courses.length)
+          throw new Error('课表卡片未能识别，请核对原始页面或使用表格导入。');
+        result.semester = inferSemester(
+          doc.body ? doc.body.innerText || doc.body.textContent || '' : ''
+        );
+        return result;
+      }
+    }
     const htmlWarnings = [];
+    let htmlSemesterText = '';
     if (isText && /<(?:html|table|tr|td)\b/i.test(input)) {
+      // Extract only text for labelled semester metadata; discard scripts and styles.
+      htmlSemesterText = input
+        .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;|&#160;/gi, ' ');
       // A saved URP page also contains hidden lists and script templates.
       const urpTable = input.match(
         /<table\b[^>]*\bid\s*=\s*["']courseTable["'][^>]*>[\s\S]*?<\/table\s*>/i
@@ -493,6 +763,20 @@
     });
     const result = parseWorkbook(workbook, XLSX);
     result.warnings.push(...htmlWarnings);
+    if (htmlSemesterText) {
+      const htmlSemester = inferSemester(htmlSemesterText);
+      const workbookSemester = result.semester || {};
+      result.semester =
+        htmlSemester.conflict ||
+        workbookSemester.conflict ||
+        (htmlSemester.startDate &&
+          workbookSemester.startDate &&
+          htmlSemester.startDate !== workbookSemester.startDate)
+          ? { conflict: true }
+          : htmlSemester.startDate
+            ? htmlSemester
+            : workbookSemester;
+    }
     return result;
   }
 
@@ -539,6 +823,7 @@
       times: DEFAULT_TIMES.map((x) => x.slice()),
       courses: [],
       reminders: { courseMinutes: 10 },
+      showInactiveCourses: true,
       sourceName: '',
       savedAt: ''
     };
@@ -577,6 +862,9 @@
       ids.add(c.id);
     }
     const reminders = raw.reminders === undefined ? { courseMinutes: 10 } : raw.reminders;
+    const showInactiveCourses =
+      raw.showInactiveCourses === undefined ? true : raw.showInactiveCourses;
+    if (typeof showInactiveCourses !== 'boolean') throw new Error('非本周课程显示设置无效');
     if (
       !reminders ||
       typeof reminders !== 'object' ||
@@ -591,6 +879,7 @@
       times,
       courses,
       reminders: { courseMinutes: reminders.courseMinutes },
+      showInactiveCourses,
       sourceName: text(raw.sourceName).slice(0, 200),
       savedAt: text(raw.savedAt).slice(0, 40)
     };
@@ -643,7 +932,15 @@
           b = courses[j];
         if (a.day === b.day && a.start <= b.end && b.start <= a.end) {
           const weeks = a.weeks.filter((w) => b.weeks.includes(w));
-          if (weeks.length) results.push({ a: a.id, b: b.id, weeks });
+          if (weeks.length)
+            results.push({
+              a: a.id,
+              b: b.id,
+              weeks,
+              day: a.day,
+              start: Math.max(a.start, b.start),
+              end: Math.min(a.end, b.end)
+            });
         }
       }
     return results;
@@ -653,9 +950,9 @@
       .filter((c) => c.weeks.includes(week))
       .sort((a, b) => a.day - b.day || a.start - b.start || a.name.localeCompare(b.name, 'zh'));
   }
-  function coursesForWeekView(courses, week) {
+  function coursesForWeekView(courses, week, showInactiveCourses = true) {
     return courses
-      .filter((c) => c.kind !== 'personal' || c.weeks.includes(week))
+      .filter((c) => c.weeks.includes(week) || (showInactiveCourses && c.kind !== 'personal'))
       .map((c) => ({ ...c, isActive: c.weeks.includes(week) }))
       .sort(
         (a, b) =>
@@ -781,6 +1078,8 @@
     validateCourse,
     parseCell,
     parseMatrix,
+    parseZhengfangDocument,
+    inferSemester,
     parseWorkbook,
     readImport,
     parseDate,

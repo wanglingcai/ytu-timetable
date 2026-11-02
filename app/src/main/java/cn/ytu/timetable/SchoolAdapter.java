@@ -17,7 +17,7 @@ public interface SchoolAdapter {
     Set<String> allowedHosts();
     SchoolConfig config();
 
-    /** Applies the adapter's HTTPS allowlist to a browser URL. */
+    /** Applies the configured school origins; HTTP requires an explicit per-host opt-in. */
     default boolean allows(String url) { return config().allowed(url); }
     /** Allows only the configured course page as the read target. */
     default boolean isCoursePage(String url) { return config().isResultPage(url); }
@@ -26,5 +26,9 @@ public interface SchoolAdapter {
 
     /** Reads and normalizes the official read-only API response. */
     JSONObject readApi(String cookie, String userAgent) throws AdapterException;
+    default String readContextAsset() { return ""; }
+    default JSONObject readApi(String cookie, String userAgent, JSONObject context) throws AdapterException {
+        return readApi(cookie,userAgent);
+    }
     JSONObject parseApi(String json) throws Exception;
 }

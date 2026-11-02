@@ -18,6 +18,23 @@ window.TimetableApp.createUI = function () {
   };
   const courseTitle = (course) =>
     course.kind === 'personal' ? course.name : course.name.replace(/_\d+$/, '') || course.name;
+  function conflictLabel(conflict, courses, times, startDate, week) {
+    const T = window.Timetable;
+    const a = courses.find((course) => course.id === conflict.a),
+      b = courses.find((course) => course.id === conflict.b);
+    const sections =
+      conflict.start === conflict.end ? conflict.start : conflict.start + '–' + conflict.end;
+    const begin = times[conflict.start - 1],
+      finish = times[conflict.end - 1];
+    const time = begin && finish ? '（' + begin[0] + '–' + finish[1] + '）' : '';
+    const date =
+      week && startDate
+        ? T.weekDates(startDate, week)[conflict.day - 1].slice(5).replace('-', '/') + ' '
+        : '第 ' + T.formatWeeks(conflict.weeks) + ' 周 · ';
+    return (
+      date + DAY[conflict.day] + ' 第 ' + sections + ' 节' + time + '：' + a.name + ' 与 ' + b.name
+    );
+  }
   function toast(message) {
     const t = $('toast');
     t.textContent = message;
@@ -64,6 +81,7 @@ window.TimetableApp.createUI = function () {
     el,
     append,
     courseTitle,
+    conflictLabel,
     toast,
     showDialog,
     closeDialog,

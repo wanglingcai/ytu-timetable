@@ -1518,7 +1518,53 @@ textarea {
   text-overflow: ellipsis;
 }
 #scheduleGrid .course-card.conflict {
-  outline: 0;
+  outline: 1.5px solid #b45309;
+  outline-offset: -1.5px;
+}
+.schedule-legend {
+  flex-wrap: wrap;
+}
+.inactive-toggle {
+  padding: 4px 9px;
+  min-height: 28px;
+  border-radius: 8px;
+  color: #0369a1;
+  background: #e0f2fe;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.inactive-toggle[aria-pressed='false'] {
+  background: #f1f5f9;
+  color: #475569;
+}
+.conflict-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  white-space: normal;
+}
+.conflict-list li + li {
+  margin-top: 7px;
+}
+.conflict-link {
+  display: inline;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.conflict-label,
+.list-card .conflict-label,
+#scheduleGrid .course-card .conflict-label {
+  color: #9a3412;
+  font-weight: 700;
+}
+.list-card.conflict {
+  box-shadow: inset 3px 0 #b45309;
 }
 #scheduleGrid .course-card.inactive,
 .time-chip.inactive {
