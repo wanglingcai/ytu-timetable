@@ -1,4 +1,4 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..');
 const core=fs.readFileSync(path.join(root,'app/src/main/assets/core.js'),'utf8');

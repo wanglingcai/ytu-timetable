@@ -31,6 +31,21 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
     return minutes < 0 ? '关闭' : minutes === 0 ? '准点提醒' : '提前 ' + minutes + ' 分钟';
   }
   function refreshReminderStatus() {
+    const courseMinutes = $('settingsDialog').open
+      ? Number($('courseReminder').value)
+      : model.state.reminders.courseMinutes;
+    const reminderEnabled =
+      courseMinutes >= 0 ||
+      model.state.courses.some(
+        (course) => course.kind === 'personal' && course.reminderMinutes >= 0
+      );
+    $('reminderStatus').hidden = !reminderEnabled;
+    if (!reminderEnabled) {
+      $('reminderPermissionHint').hidden = true;
+      $('notificationPermission').hidden = true;
+      $('exactReminderPermission').hidden = true;
+      return;
+    }
     let message = '提醒在安卓应用中生效；浏览器仅保存设置。',
       needsPermission = false;
     const native = window.AndroidLocal && typeof AndroidLocal.reminderStatus === 'function';
@@ -128,6 +143,7 @@ window.TimetableApp.createSettings = function ({ T, ui, model, persist, render, 
   function bindEvents() {
     $('settingsButton').onclick = openSettings;
     $('reminderSettingsButton').onclick = openSettings;
+    $('courseReminder').onchange = refreshReminderStatus;
     $('notificationPermission').onclick = () => AndroidLocal.reminderPermission('notifications');
     $('exactReminderPermission').onclick = () => AndroidLocal.reminderPermission('exact');
     $('settingsForm').onsubmit = (event) => {

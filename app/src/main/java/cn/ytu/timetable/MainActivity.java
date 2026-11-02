@@ -195,6 +195,16 @@ public final class MainActivity extends Activity {
             }
         }
 
+        @JavascriptInterface public String readGuideState() {
+            return getSharedPreferences("onboarding", MODE_PRIVATE).getString("state", "");
+        }
+
+        @JavascriptInterface public boolean saveGuideState(String json) {
+            if (json == null || json.length() > 1024) return false;
+            try { new JSONObject(json); } catch (Exception invalid) { return false; }
+            return getSharedPreferences("onboarding", MODE_PRIVATE).edit().putString("state", json).commit();
+        }
+
         @JavascriptInterface public boolean saveState(String json) {
             if (json == null) return false;
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);

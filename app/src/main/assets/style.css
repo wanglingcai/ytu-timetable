@@ -459,6 +459,64 @@ dialog::backdrop {
   background: #233b305c;
   backdrop-filter: blur(3px);
 }
+.welcome-card h2 {
+  margin: 0 0 12px;
+}
+.welcome-card .large {
+  width: 100%;
+  margin-top: 12px;
+}
+.welcome-actions {
+  display: flex;
+  justify-content: space-around;
+  gap: 12px;
+  margin-top: 16px;
+}
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+}
+.guide-overlay[hidden] {
+  display: none;
+}
+.guide-spotlight {
+  position: fixed;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 0 200vmax rgba(25, 38, 49, 0.64);
+  pointer-events: none;
+}
+.guide-card {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  max-width: 440px;
+  margin: auto;
+  padding: 18px;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 12px 35px #0003;
+}
+.guide-card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.guide-card p {
+  margin: 8px 0;
+}
+.guide-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.guide-actions #guideSkip {
+  margin-right: auto;
+}
 label {
   display: block;
   font-size: 12px;

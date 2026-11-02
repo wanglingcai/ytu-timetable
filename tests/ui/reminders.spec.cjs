@@ -1,10 +1,10 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 const fs=require('node:fs');
 async function setup(page) {
   await page.goto('/');
   await page.evaluate(()=>{
     const school=Timetable.validateCourse({id:'school',name:'模拟数学',day:1,start:1,end:2,weeks:[1,3,5],room:'A101'});
-    localStorage.setItem('ytu-timetable-v1',JSON.stringify({...Timetable.defaultState(),startDate:'2026-08-31',courses:[school]}));
+    localStorage.setItem('ytu-timetable-v1',JSON.stringify({...Timetable.defaultState(),reminders:{courseMinutes:10},startDate:'2026-08-31',courses:[school]}));
   });
   await page.reload();await page.locator('#weekSelect').selectOption('8');
 }
@@ -29,6 +29,7 @@ test('课程提醒与个人安排分别设置，修改后备份恢复保留提�
   await page.evaluate(()=>localStorage.clear());await page.reload();
   await page.locator('#fileInput').setInputFiles({name:'模拟提醒备份.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(state))});
   await page.locator('#reviewCheck').check();await page.locator('#saveImport').click();
+  await expect(page.locator('#importDialog')).not.toBeVisible();
   await page.evaluate(()=>openReminder({id:JSON.parse(localStorage.getItem('ytu-timetable-v1')).courses.find(c=>c.kind==='personal').id,date:'2026-10-25'}));
   await expect(page.locator('#weekSelect')).toHaveValue('8');await expect(page.locator('#courseDetail')).toContainText('模拟自习');await expect(page.locator('#courseDetail')).toContainText('准点提醒');
   await page.getByRole('button',{name:'修改安排',exact:true}).click();await page.locator('#personalReminder').selectOption('-1');await page.locator('#saveCourse').click();

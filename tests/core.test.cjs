@@ -123,6 +123,7 @@ test('个人安排仅在对应周显示，非本周学校课程仍保留为灰�
 });
 
 test('旧备份默认课程提前十分钟，提醒选项可备份且拒绝非法值',()=>{
+  assert.equal(T.defaultState().reminders.courseMinutes,-1);
   const old={...T.defaultState(),courses:[makeCourse()]};delete old.reminders;
   assert.deepEqual(T.validateState(old).reminders,{courseMinutes:10});
   for(const minutes of [-1,0,5,10,15,30]) {

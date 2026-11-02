@@ -1,4 +1,4 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 const path=require('node:path');
 async function sample(page) {
   await page.clock.install({time:new Date('2026-10-21T13:35:20+08:00')});

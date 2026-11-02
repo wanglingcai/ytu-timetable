@@ -1,4 +1,4 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 const payload={source:'self-portal',schoolName:'测试学校',courses:[{name:'数学',day:1,start:1,end:2,weeks:[1,2,3,16],teacher:'',room:''}]};
 test('未识别日期时必须填写，周数按课程最晚周建议，不会提前保存',async({page})=>{
   await page.goto('/'); await page.evaluate(p=>receivePortalImport(p),payload);

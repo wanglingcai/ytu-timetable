@@ -1,4 +1,4 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 const fs=require('node:fs');
 async function setup(page,withPlan=false) {
   await page.goto('/');

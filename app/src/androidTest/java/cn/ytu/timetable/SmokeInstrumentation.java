@@ -28,9 +28,11 @@ public final class SmokeInstrumentation extends Instrumentation {
     private boolean selfPortalAdapters;
     private boolean scheduleMode;
     private boolean gxuLoginMode;
+    private boolean onboardingMode;
     private final StringBuilder report = new StringBuilder();
-    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); selfPortalMode=args!=null && "true".equals(args.getString("selfPortal")); selfPortalAdapters=args!=null && "true".equals(args.getString("selfPortalAdapters")); scheduleMode=args!=null && "true".equals(args.getString("schedule")); gxuLoginMode=args!=null && "true".equals(args.getString("gxuLogin")); start(); }
+    @Override public void onCreate(Bundle args) { super.onCreate(args); verifyExisting=args!=null && "true".equals(args.getString("verifyExisting")); reminderMode=args==null?null:args.getString("reminders"); adapterMode=args!=null && "true".equals(args.getString("adapters")); selfPortalMode=args!=null && "true".equals(args.getString("selfPortal")); selfPortalAdapters=args!=null && "true".equals(args.getString("selfPortalAdapters")); scheduleMode=args!=null && "true".equals(args.getString("schedule")); gxuLoginMode=args!=null && "true".equals(args.getString("gxuLogin")); onboardingMode=args!=null && "true".equals(args.getString("onboarding")); start(); }
     @Override public void onStart() {
+        if(onboardingMode){checkOnboarding();return;}
         if(gxuLoginMode){new GxuLoginChecks(this).run();return;}
         if(scheduleMode){checkSchedule();return;}
         if(selfPortalAdapters){new SelfPortalAdapterChecks(this).run();return;}
@@ -280,6 +282,32 @@ public final class SmokeInstrumentation extends Instrumentation {
             try{if(original!=null)js("(function(){var old="+original+";return AndroidLocal.saveState(old||JSON.stringify(Timetable.defaultState()));})()");}catch(Exception ignored){}
             if(activity!=null)runOnMainSync(()->activity.finish());
         }
+    }
+    private void checkOnboarding() {
+        Bundle result=new Bundle();
+        try {
+            launch();await("document.readyState==='complete' && !!window.handleAndroidBack");
+            check("document.querySelector('#welcomeDialog').open", "首次启动展示欢迎卡片");
+            check("JSON.parse(AndroidLocal.readGuideState()).welcomeSeen===true", "引导状态单独写入原生偏好");
+            js("document.querySelector('#welcomeSample').click();true");
+            check("document.querySelector('#importFileName').textContent.includes('非本人真实课表')", "示例预览明确标注");
+            js("document.querySelector('#importStart').value='2026-08-31';document.querySelector('#reviewCheck').checked=true;document.querySelector('#saveImport').click();true");
+            await("!document.querySelector('#guideOverlay').hidden");
+            check("window.handleAndroidBack() && document.querySelector('#guideOverlay').hidden", "安卓返回键退出示例引导");
+            check("!JSON.parse(AndroidLocal.readGuideState()).realGuideDone", "示例不视为真实导入");
+            js("receivePortalImport({source:'mock',schoolName:'模拟学校',courses:[{name:'测试课程',day:1,start:1,end:2,weeks:[1,2]}]});document.querySelector('#importStart').value='2026-08-31';document.querySelector('#reviewCheck').checked=true;document.querySelector('#saveImport').click();true");
+            await("!document.querySelector('#guideOverlay').hidden");
+            js("document.querySelector('#guideSkip').click();true");
+            check("JSON.parse(AndroidLocal.readGuideState()).realGuideDone===true", "跳过真实课表引导后记住状态");
+            runOnMainSync(()->activity.finish());waitForIdleSync();launch();await("document.readyState==='complete' && !!window.handleAndroidBack");
+            check("!document.querySelector('#welcomeDialog').open && document.querySelector('#guideOverlay').hidden", "重启不会重复弹出");
+            runOnMainSync(()->activity.finish());waitForIdleSync();
+            getTargetContext().getSharedPreferences("onboarding",android.content.Context.MODE_PRIVATE).edit().clear().commit();
+            launch();await("document.readyState==='complete' && !!window.handleAndroidBack");
+            check("!document.querySelector('#welcomeDialog').open && JSON.parse(AndroidLocal.readGuideState()).realGuideDone===true", "已有课表用户升级不弹欢迎和自动引导");
+            result.putString("stream","\nPASS: "+checks+" onboarding Android checks\n"+report);finish(Activity.RESULT_OK,result);
+        } catch(Throwable error) {result.putString("stream","\nFAIL: "+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result);}
+        finally {if(activity!=null)runOnMainSync(()->activity.finish());}
     }
     private void launch() {
         Intent intent=getTargetContext().getPackageManager().getLaunchIntentForPackage(getTargetContext().getPackageName());

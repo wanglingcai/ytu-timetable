@@ -1,4 +1,4 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 const fs=require('node:fs');
 async function fixture(page){
  await page.clock.setFixedTime(new Date('2026-11-02T08:42:00+08:00'));

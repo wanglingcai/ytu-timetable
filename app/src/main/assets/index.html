@@ -18,6 +18,7 @@
     <script src="courses.js" defer></script>
     <script src="settings.js" defer></script>
     <script src="import.js" defer></script>
+    <script src="onboarding.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body class="app-loading">
@@ -130,7 +131,7 @@
       </section>
       <footer>
         <span id="saveLabel">本地保存 · 离线可用</span><span>·</span>
-        <span id="appVersion">v0.9.7</span>
+        <span id="appVersion">v0.9.8</span>
       </footer>
     </main>
     <nav class="quickbar" aria-label="课表操作">
@@ -139,6 +140,39 @@
         <span aria-hidden="true">＋</span> 添加</button
       ><button id="backupButton" class="quick-action">导出完整备份</button>
     </nav>
+    <dialog id="welcomeDialog" aria-labelledby="welcomeTitle">
+      <div class="welcome-card">
+        <p class="eyebrow">你好，新同学</p>
+        <h2 id="welcomeTitle">欢迎使用下节啥课</h2>
+        <p>导入你的课表，随时查看本周安排和下一节课。</p>
+        <p class="small">课表保存在本机，导入后离线也能看。</p>
+        <button id="welcomeImport" class="button primary large">导入我的课表</button>
+        <div class="welcome-actions">
+          <button id="welcomeSample" class="text-button">先体验示例</button>
+          <button id="welcomeSkip" class="text-button">暂时跳过</button>
+        </div>
+      </div>
+    </dialog>
+    <div id="guideOverlay" class="guide-overlay" hidden>
+      <div id="guideSpotlight" class="guide-spotlight" aria-hidden="true"></div>
+      <div
+        id="guideCard"
+        class="guide-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="guideTitle"
+        tabindex="-1"
+      >
+        <p id="guideProgress" class="eyebrow"></p>
+        <h2 id="guideTitle"></h2>
+        <p id="guideText"></p>
+        <div class="guide-actions">
+          <button id="guideSkip" class="text-button">跳过</button>
+          <button id="guidePrevious" class="button soft">上一步</button>
+          <button id="guideNext" class="button primary">下一步</button>
+        </div>
+      </div>
+    </div>
     <dialog id="importChoice" class="bottom-sheet choice-sheet" aria-labelledby="importChoiceTitle">
       <div class="sheet-handle" aria-hidden="true"></div>
       <div class="dialog-head">
@@ -152,6 +186,7 @@
       <select id="portalSchool" aria-label="选择已支持的学校">
         <option value="ytu">烟台大学</option>
       </select>
+      <p class="small">先选择学校，再按学校流程登录并打开课表页面。</p>
       <button id="portalImport" class="choice-option">
         <span class="choice-icon" aria-hidden="true">校</span
         ><span><strong>官网登录读取</strong><small>在官网登录，读取本学期课表</small></span
@@ -217,7 +252,9 @@
         <label>第一周周一<input id="importStart" type="date" required /></label
         ><label>学期总周数<input id="importWeeks" type="number" min="1" max="60" required /></label>
       </div>
+      <p class="small">第一周周一决定当前周次；识别到日期时会自动带入，请核对。</p>
       <p id="importDateSuggestion" class="small" aria-live="polite"></p>
+      <p class="small">课程最晚周次可能早于学期结束，请按学校校历确认总周数。</p>
       <p id="importWeeksSuggestion" class="small" aria-live="polite"></p>
       <p id="importHint" class="small"></p>
       <div class="confirm-row">
@@ -225,6 +262,7 @@
           >我已核对周次、日期和下方课程；知晓未识别的记录不会导入</label
         >
       </div>
+      <p class="notice">先核对课程、周次和学期日期，再保存。</p>
       <div id="previewList" class="course-list"></div>
       <div class="dialog-actions">
         <button id="cancelImport" class="button soft">取消</button
@@ -297,6 +335,8 @@
           ><button class="button primary" type="submit">保存设置</button>
         </div>
       </form>
+      <h3>使用帮助</h3>
+      <button id="replayGuide" type="button" class="button soft">新手引导</button>
       <p class="small">
         数据只保存在本机，卸载或清除应用数据前请导出备份。应用不会自动获知学校调课。
       </p>

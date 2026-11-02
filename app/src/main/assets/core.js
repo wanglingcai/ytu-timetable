@@ -822,7 +822,7 @@
       totalWeeks: 20,
       times: DEFAULT_TIMES.map((x) => x.slice()),
       courses: [],
-      reminders: { courseMinutes: 10 },
+      reminders: { courseMinutes: -1 },
       showInactiveCourses: true,
       sourceName: '',
       savedAt: ''

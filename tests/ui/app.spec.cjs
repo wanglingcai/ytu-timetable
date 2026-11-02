@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures.cjs');
 const path = require('node:path');
 const fs = require('node:fs');
 const fixture = (name) => path.resolve(__dirname, '../../examples', name);

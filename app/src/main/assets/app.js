@@ -21,11 +21,15 @@
     renderedDate: ''
   };
   window.receiveNativeError = (payload) => toast(payload.message || '操作失败，请重试');
-  window.handleAndroidBack = ui.handleAndroidBack;
+  window.handleAndroidBack = () => guide.exit() || ui.handleAndroidBack();
+  let hadStoredState = false;
   function load() {
     try {
       const json = window.AndroidLocal ? AndroidLocal.readState() : localStorage.getItem(KEY);
-      if (json) model.state = T.validateState(JSON.parse(json));
+      if (json) {
+        model.state = T.validateState(JSON.parse(json));
+        hadStoredState = true;
+      }
     } catch (error) {
       model.storageProblem = true;
       setTimeout(() => toast('本机数据读取失败，尚未覆盖。可重新导入备份恢复。'), 50);
@@ -95,8 +99,10 @@
     model,
     persist,
     render,
-    appearance: window.TimetableAppearance
+    appearance: window.TimetableAppearance,
+    onImported: (kind) => guide.onImported(kind)
   });
+  const guide = factories.createOnboarding({ ui, model, sample: () => imports.sample() });
   window.refreshReminderStatus = settings.refreshReminderStatus;
   window.openReminder = settings.openReminder;
   window.receiveImport = imports.receiveImport;
@@ -105,6 +111,7 @@
   settings.bindEvents();
   courses.bindEvents();
   imports.bindEvents();
+  guide.bindEvents();
   function goWeek(value) {
     model.week = Math.max(1, Math.min(model.state.totalWeeks, value));
     render();
@@ -150,6 +157,7 @@
   });
   load();
   render();
+  guide.initialize(hadStoredState || model.storageProblem);
   view.animateEntrance();
   refreshReminderStatus();
   requestAnimationFrame(() => document.body.classList.remove('app-loading'));

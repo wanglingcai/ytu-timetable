@@ -7,9 +7,10 @@
 ## 主要功能
 
 - 查看每周课表、下一节课和桌面小组件；在课表上方一键显示或隐藏非本周课程。
-- 添加个人安排，设置课程和安排提醒；时间冲突会标出课程、周次和具体时间。
+- 添加个人安排，按需开启课程和安排提醒；时间冲突会标出课程、周次和具体时间。
 - 导入 Excel、CSV、TSV、HTML 或应用备份，也可通过烟台大学固定入口或自助输入学校网址尝试读取课表。
 - 自定义背景，导出或恢复完整备份。
+- 首次使用可查看新手引导，也可以在设置底部重新打开。
 
 官网导入仍在测试，不保证兼容所有学校；自助输入网址后，已适配的课表页面（含嵌入页面）会自动使用对应学校的读取规则。导入后请核对课程、周次和学期日期。使用 HTTP 教务网址时，连接不加密，建议优先使用学校提供的 HTTPS 入口。
 
@@ -27,7 +28,7 @@ npm.cmd test
 .\gradlew.bat :app:assembleDebug
 ```
 
-Debug APK 生成在 `app/build/outputs/apk/debug/app-debug.apk`。项目当前源码版本为 **0.9.7（versionCode 25）**。配置本地签名后，可运行 `./scripts/build.ps1 -Release` 构建正式 APK 和校验文件。
+Debug APK 生成在 `app/build/outputs/apk/debug/app-debug.apk`。项目源码版本为 **0.9.8（versionCode 26）**。配置本地签名后，可运行 `./scripts/build.ps1 -Release` 构建正式 APK 和校验文件。
 
 ## 项目结构
 

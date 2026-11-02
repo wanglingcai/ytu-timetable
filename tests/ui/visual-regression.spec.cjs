@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures.cjs');
 const path = require('node:path');
 
 async function fixture(page, width = 393) {

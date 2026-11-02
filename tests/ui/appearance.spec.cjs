@@ -1,4 +1,4 @@
-const {test,expect}=require('@playwright/test');
+const {test,expect}=require('./fixtures.cjs');
 async function fixture(page) {
   await page.clock.install({time:new Date('2026-10-21T13:35:20+08:00')});
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/');

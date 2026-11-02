@@ -1,6 +1,14 @@
 'use strict';
 // Classic script factories also work from Android's offline file URL.
-window.TimetableApp.createImport = function ({ T, ui, model, persist, render, appearance }) {
+window.TimetableApp.createImport = function ({
+  T,
+  ui,
+  model,
+  persist,
+  render,
+  appearance,
+  onImported
+}) {
   const { $, DAY, el, append, toast, showDialog, closeDialog, conflictLabel } = ui;
   const MAX_BYTES = T.MAX_IMPORT_BYTES;
   const MAX_BACKUP_BYTES = T.MAX_BACKUP_BYTES;
@@ -241,6 +249,7 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
       sourceName: preview.name
     };
     if (persist(next, '课表已保存，之后可直接离线查看')) {
+      const importKind = preview.restore ? 'backup' : preview.isSample ? 'sample' : 'real';
       if (preview.appearance && appearance && typeof appearance.importBackup === 'function') {
         try {
           await appearance.importBackup(preview.appearance);
@@ -255,6 +264,7 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
       render();
       closeDialog('importDialog');
       preview = null;
+      onImported(importKind);
     }
   }
   function sample() {
@@ -267,7 +277,7 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
       ['示例 · 上机实践', '星期一', '5-6', '8-15', '示例教师', '网络实验室'],
       ['示例 · 指定周讲座', '星期六', '1-2', '第3周', '示例教师', '五教 305']
     ];
-    preview = { ...T.parseMatrix(rows), name: '体验示例（非本人真实课表）' };
+    preview = { ...T.parseMatrix(rows), name: '体验示例（非本人真实课表）', isSample: true };
     showPreview();
     $('importSemester').value = '体验示例 · 请导入真实课表';
   }
@@ -385,5 +395,5 @@ window.TimetableApp.createImport = function ({ T, ui, model, persist, render, ap
       (id) => ($(id).onclick = () => showDialog('importChoice'))
     );
   }
-  return { receivePortalImport, receiveImport, bindEvents };
+  return { receivePortalImport, receiveImport, bindEvents, sample };
 };
