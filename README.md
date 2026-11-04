@@ -41,6 +41,7 @@ docs/                  项目图片与补充资料
 scripts/               构建和开发脚本
 ```
 
+若在使用中遇到问题，或者有什么改进意见欢迎提出issue。
 ## 许可证
 
 本项目采用 [PolyForm Noncommercial 1.0.0](LICENSE)，可用于个人、学习等非商业用途；商业使用需取得作者书面许可。第三方组件许可详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
