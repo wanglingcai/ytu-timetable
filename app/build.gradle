@@ -15,8 +15,8 @@ android {
         applicationId 'cn.ytu.timetable.personal'
         minSdk 26
         targetSdk 35
-        versionCode 26
-        versionName '0.9.8'
+        versionCode 27
+        versionName '0.9.9'
         testInstrumentationRunner 'cn.ytu.timetable.SmokeInstrumentation'
     }
     signingConfigs {
@@ -35,6 +35,9 @@ android {
         }
         release {
             minifyEnabled false
+            if (project.hasProperty('previewSuffix')) {
+                versionNameSuffix project.property('previewSuffix').toString()
+            }
             if (signingPropertiesFile.exists()) {
                 signingConfig signingConfigs.release
             }

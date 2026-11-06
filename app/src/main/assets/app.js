@@ -21,7 +21,7 @@
     renderedDate: ''
   };
   window.receiveNativeError = (payload) => toast(payload.message || '操作失败，请重试');
-  window.handleAndroidBack = () => guide.exit() || ui.handleAndroidBack();
+  window.handleAndroidBack = () => ui.handleAndroidBack() || guide.exit();
   let hadStoredState = false;
   function load() {
     try {
@@ -113,6 +113,7 @@
   imports.bindEvents();
   guide.bindEvents();
   function goWeek(value) {
+    view.clearSlotSelection();
     model.week = Math.max(1, Math.min(model.state.totalWeeks, value));
     render();
     view.animateEntrance();
@@ -136,12 +137,14 @@
     swipeStart = null;
     const dx = event.clientX - start.x,
       dy = event.clientY - start.y;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) view.clearSlotSelection();
     if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
     if (dx < 0 && model.week < model.state.totalWeeks) goWeek(model.week + 1);
     if (dx > 0 && model.week > 1) goWeek(model.week - 1);
   });
   swipeTarget.addEventListener('pointercancel', () => {
     swipeStart = null;
+    view.clearSlotSelection();
   });
   $('todayButton').onclick = () => goWeek(T.currentWeek(model.state.startDate));
   $('viewToggle').onclick = () => {

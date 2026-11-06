@@ -60,6 +60,7 @@ test('重构对照：列表、详情与非本周', async ({ page }) => {
 test('重构对照：编辑面板与短视口', async ({ page }) => {
   await fixture(page);
   await page.locator('.empty-slot[data-day="7"][data-section="7"]').click();
+  await page.locator('.empty-slot[data-day="7"][data-section="7"]').click();
   await page.locator('#courseName').fill('操场跑步');
   await page.locator('#courseRoom').fill('东操场');
   await expect(page).toHaveScreenshot('editor.png', { maxDiffPixels: 0 });

@@ -144,6 +144,8 @@ public final class SmokeInstrumentation extends Instrumentation {
             check("document.querySelectorAll('#previewList .list-card').length===3 && document.querySelector('#previewList').textContent.includes('教师甲 教师乙') && document.querySelector('#previewList').textContent.includes('10-11 周')", "官网结构化响应进入同一导入预览，保留教师和实际周次");
             js("document.querySelector('#cancelImport').click();true");
             js("document.querySelector('.empty-slot[data-day=\"7\"][data-section=\"5\"]').click();true");
+            check("!document.querySelector('#editDialog').open && document.querySelector('.empty-slot.selected-slot')!==null", "首次点击只选中空白格");
+            js("document.querySelector('.empty-slot[data-day=\"7\"][data-section=\"5\"]').click();true");
             check("document.querySelector('#editDialog').open && document.querySelector('#courseDay').value==='7' && document.querySelector('#courseSections').value==='5' && document.querySelector('#courseWeeks').value==='3'", "空白格打开个人安排并预填星期、节次和所选周");
             await("Math.abs(document.querySelector('#editDialog').getBoundingClientRect().bottom-innerHeight)<2");
             check("Math.abs(document.querySelector('#editDialog').getBoundingClientRect().bottom-innerHeight)<2 && document.querySelector('#repeatOnce').getAttribute('aria-pressed')==='true' && document.querySelector('#customWeeksField').hidden && !document.querySelector('#notesDetails').open", "安卓底部添加面板默认单周，备注和自定义周次按需展开");
@@ -276,6 +278,14 @@ public final class SmokeInstrumentation extends Instrumentation {
             check("document.querySelector('#toggleInactive').getAttribute('aria-pressed')==='false'", "重建安卓 Activity 后保持隐藏非本周课程");
             tapElement("#toggleInactive");await("document.querySelectorAll('.course-card').length===3");
             check("JSON.parse(AndroidLocal.readState()).showInactiveCourses===true", "重新开启后显示其他周课程");
+            js("(function(){var s=JSON.parse(AndroidLocal.readState());s.courses.push(Timetable.validateCourse({id:'other-a',name:'非本周课程甲',day:1,start:1,end:2,weeks:[2],room:'A101'}),Timetable.validateCourse({id:'other-b',name:'非本周跨节',day:1,start:1,end:4,weeks:[3],room:'B202'}));return AndroidLocal.saveState(JSON.stringify(s));})()");
+            runOnMainSync(()->activity.finish());waitForIdleSync();launch();
+            await("document.readyState==='complete' && !!document.querySelector('.overlap-badge')");
+            check("document.querySelectorAll('.course-card.conflict').length===2 && document.querySelector('.overlap-badge').textContent==='+2'", "本周真实冲突保留，其他周课程显示数量");
+            check("document.querySelector('.other-week-marker')!==null", "跨出本周课程的节次仍能找到其他周课程");
+            js("document.querySelector('.overlap-badge').closest('button').click();true");
+            check("document.querySelector('#overlapDialog').open && document.querySelector('#overlapList').textContent.includes('非本周跨节')", "重叠课程列表保留课程、地点和周次");
+            check("window.handleAndroidBack() && !document.querySelector('#overlapDialog').open && JSON.parse(AndroidLocal.readState()).courses.length===5", "安卓返回键关闭列表且没有修改课程");
             result.putString("stream","\nPASS: "+checks+" schedule checks\n"+report);finish(Activity.RESULT_OK,result);
         } catch(Throwable error){result.putString("stream","\nFAIL: "+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result);}
         finally {

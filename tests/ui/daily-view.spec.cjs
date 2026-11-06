@@ -28,6 +28,7 @@ test('首页真实下一节、时间线、稳定配色和切周后的定位',asy
 });
 test('底部添加、快捷周次、备注展开、短视口保存与取消草稿',async({page})=>{
   await sample(page);await page.locator('.empty-slot[data-day="7"][data-section="7"]').click();
+  await page.locator('.empty-slot[data-day="7"][data-section="7"]').click();
   await expect(page.locator('#editContext')).toHaveText('10月25日 星期日 · 第 7 节');
   await expect(page.locator('#repeatOnce')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#customWeeksField')).not.toBeVisible();await expect(page.locator('#entryNotes')).not.toBeVisible();
   await page.locator('#courseName').fill('操场跑步');await page.locator('#courseRoom').fill('东操场');

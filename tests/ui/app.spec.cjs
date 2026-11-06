@@ -53,6 +53,28 @@ test('二进制 XLS、HTML、CSV 均可通过真实文件选择导入', async ({
     );
   }
 });
+test('学校导出的方括号周次 XLS 可预览并保存，未排课课程明确提示', async ({ page }) => {
+  const XLSX = require('../../app/src/main/assets/vendor/xlsx.full.min.js');
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ['模拟课表'],
+    ['节次', '星期一', '星期二', '星期三'],
+    ['第3节', '模拟课程\n模拟教师\n1-3,5-7([周])[03-04-05节]\n模拟楼101', '', ''],
+    ['无课表课程'],
+    ['序号', '课程名称', '授课教师'],
+    ['1', '未排课', '模拟教师']
+  ]);
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, '模拟');
+  await page.goto('/');
+  await page.locator('#fileInput').setInputFiles({name:'模拟课表.xls',mimeType:'application/vnd.ms-excel',buffer:Buffer.from(XLSX.write(book,{type:'array',bookType:'biff8'}))});
+  await expect(page.locator('#previewList')).toContainText('模拟课程');
+  await expect(page.locator('#previewList')).toContainText('第 3–5 节');
+  await expect(page.locator('#importWarnings')).toContainText('无课表课程');
+  await page.locator('#importStart').fill('2026-08-31');
+  await page.locator('#reviewCheck').check();await page.locator('#saveImport').click();
+  const state=JSON.parse(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1')));
+  expect(state.courses[0]).toMatchObject({name:'模拟课程',teacher:'模拟教师',room:'模拟楼101',day:1,start:3,end:5,weeks:[1,2,3,5,6,7]});
+});
 test('课表区域支持左右滑动切换周次，启动时先完成初始化再显示内容', async ({ page }) => {
   await page.goto('/');
   await importAndSave(page, '课程清单模板.csv');
@@ -116,6 +138,7 @@ test('设置校验、修改课程、备份恢复、失败导入不覆盖原数�
   await page.getByRole('button', { name: '修改课程', exact: true }).click();
   await page.locator('#courseRoom').fill('新增教室');
   await page.getByRole('button', { name: '保存课程', exact: true }).click();
+  await page.locator('#settingsButton').click();
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#backupButton').click();
   const download = await downloadPromise;
@@ -168,23 +191,19 @@ test('非本周灰色显示，单双周同位置都可点击，无课周保留�
   await page.locator('#saveImport').click();
   await page.locator('#weekSelect').selectOption('8');
   await expect(page.locator('.course-card:not(.inactive)')).toHaveCount(1);
-  await expect(page.locator('.course-card.inactive')).toHaveCount(3);
+  await expect(page.locator('.course-card.inactive')).toHaveCount(2);
   await expect(page.locator('#scheduleHeading')).toHaveText('本周安排 · 1 项');
   await expect(page.locator('#conflictNotice')).not.toBeVisible();
-  const active = page.locator('.course-card:not(.inactive)'),
-    odd = page.locator('.course-card.inactive').filter({ hasText: '单周参考课' });
-  const activeBounds = await active.boundingBox(),
-    oddBounds = await odd.boundingBox();
-  expect(activeBounds.y + activeBounds.height).toBeLessThanOrEqual(oddBounds.y + 1);
-  expect(activeBounds.width).toBeGreaterThan(35);
-  expect(activeBounds.height).toBeGreaterThan(oddBounds.height);
-  expect(await odd.evaluate((n) => getComputedStyle(n).backgroundColor)).toBe(
-    'rgba(241, 245, 249, 0.55)'
-  );
-  await odd.click();
+  const active = page.locator('.course-card:not(.inactive)');
+  await expect(active.locator('.overlap-badge')).toHaveText('+1');
+  expect((await active.boundingBox()).width).toBeGreaterThan(35);
+  await active.click();
+  await expect(page.locator('#overlapList')).toContainText('单周参考课');
+  await page.locator('#overlapList .list-card').filter({ hasText: '单周参考课' }).click();
   await expect(page.locator('#courseDetail')).toContainText('第 8 周不上课（非本周）');
   await expect(page.locator('#courseDetail')).toContainText('B202');
   await page.locator('#courseDialog .close-dialog').click();
+  await page.locator('#overlapDialog .close-dialog').click();
   await page.locator('#toast').evaluate((n) => (n.hidden = true));
   await page.screenshot({ path: 'test-results/inactive-courses-phone.png', fullPage: true });
   await page.locator('#viewToggle').click();
@@ -193,7 +212,7 @@ test('非本周灰色显示，单双周同位置都可点击，无课周保留�
   await page.locator('#weekSelect').selectOption('9');
   await expect(page.locator('.course-card:not(.inactive)')).toContainText('单周参考课');
   await page.locator('#weekSelect').selectOption('20');
-  await expect(page.locator('.course-card.inactive')).toHaveCount(4);
+  await expect(page.locator('.course-card.inactive')).toHaveCount(3);
   await expect(page.locator('#noWeekCourses')).toBeVisible();
   await expect(page.locator('#scheduleHeading')).toHaveText('第 20 周安排 · 0 项');
   await page.reload();

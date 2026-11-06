@@ -10,8 +10,35 @@ async function setup(page,withPlan=false) {
   },withPlan);
   await page.reload();await page.locator('#weekSelect').selectOption('8');
 }
+test('空白格先选中、再次点击编辑，切换位置和周次会清除选择',async({page})=>{
+  await setup(page);
+  const a=page.locator('.empty-slot[data-day="7"][data-section="5"]');
+  const b=page.locator('.empty-slot[data-day="7"][data-section="6"]');
+  const original=await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'));
+  await a.click();await expect(page.locator('#editDialog')).toBeHidden();
+  await expect(a).toHaveAttribute('aria-pressed','true');
+  expect(await a.evaluate(n=>getComputedStyle(n,'::after').content)).toContain('＋');
+  expect(await a.evaluate(n=>getComputedStyle(n).webkitTapHighlightColor)).toBe('rgba(0, 0, 0, 0)');
+  await b.click();await expect(a).toHaveAttribute('aria-pressed','false');await expect(b).toHaveAttribute('aria-pressed','true');
+  await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.selected-slot')).toHaveCount(0);
+  await page.locator('#weekSelect').selectOption('8');await a.click();
+  await page.locator('.course-card').first().click();await expect(page.locator('.selected-slot')).toHaveCount(0);
+  await page.locator('#courseDialog .close-dialog').click();await a.click();await a.click();
+  await expect(page.locator('#editDialog')).toBeVisible();
+  await expect(page.locator('#courseDay')).toHaveValue('7');await expect(page.locator('#courseSections')).toHaveValue('5');await expect(page.locator('#courseWeeks')).toHaveValue('8');
+  await expect(page.locator('.selected-slot')).toHaveCount(0);
+  await page.locator('#cancelEdit').click();
+  expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(original);
+  await page.keyboard.press('Tab');await a.focus();await expect(a).toBeFocused();
+  expect(await a.evaluate(n=>getComputedStyle(n).outlineStyle)).toBe('solid');
+  await page.keyboard.press('Enter');await expect(a).toHaveAttribute('aria-pressed','true');
+  await page.keyboard.press('Enter');await expect(page.locator('#editDialog')).toBeVisible();
+  await page.locator('#cancelEdit').click();
+  await page.locator('#addButton').click();await expect(page.locator('#addChoice')).toBeVisible();
+});
 test('点击空白格：单周默认、编辑备注、跨周、备份恢复与删除均保留学校课程',async({page})=>{
   await setup(page);
+  await page.locator('.empty-slot[data-day="7"][data-section="5"]').click();
   await page.locator('.empty-slot[data-day="7"][data-section="5"]').click();
   await expect(page.locator('#editTitle')).toHaveText('添加个人安排');
   await expect(page.locator('#courseDay')).toHaveValue('7');await expect(page.locator('#courseSections')).toHaveValue('5');await expect(page.locator('#courseWeeks')).toHaveValue('8');
@@ -27,7 +54,7 @@ test('点击空白格：单周默认、编辑备注、跨周、备份恢复与�
   await expect(page.locator('#entryNotes')).toHaveValue(/复习第三章/);
   await page.locator('#repeatCustom').click();await page.locator('#courseWeeks').fill('8-10');await page.locator('#entryNotes').fill('复习数学\n整理错题');await page.locator('#saveCourse').click();
   await page.reload();await page.locator('#weekSelect').selectOption('9');await expect(page.locator('.personal-entry')).toHaveCount(1);
-  const downloadPromise=page.waitForEvent('download');await page.locator('#backupButton').click();const download=await downloadPromise;
+  await page.locator('#settingsButton').click();const downloadPromise=page.waitForEvent('download');await page.locator('#backupButton').click();const download=await downloadPromise;
   const backup=JSON.parse(fs.readFileSync(await download.path(),'utf8'));expect(backup.courses.find(c=>c.kind==='personal').notes).toBe('复习数学\n整理错题');
   await page.evaluate(()=>localStorage.clear());await page.reload();
   await page.locator('#fileInput').setInputFiles({name:'备份.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(backup))});

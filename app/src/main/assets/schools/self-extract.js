@@ -51,9 +51,21 @@
               invalidTable = true;
               break;
             }
-            rows[r][col] = String(cell.innerText || cell.textContent || '')
-              .trim()
-              .slice(0, 16000);
+            var detail = cell.querySelector('.kbcontent');
+            if (detail && detail.querySelector('font[title]')) {
+              var copy = detail.cloneNode(true);
+              var breaks = copy.querySelectorAll('br');
+              for (var b = 0; b < breaks.length; b++)
+                breaks[b].parentNode.replaceChild(document.createTextNode('\n'), breaks[b]);
+              rows[r][col] = String(copy.textContent || '')
+                .replace(/\n\s*-{4,}\s*\n/g, '\n\n')
+                .trim()
+                .slice(0, 16000);
+            } else {
+              rows[r][col] = String(cell.innerText || cell.textContent || '')
+                .trim()
+                .slice(0, 16000);
+            }
             if (rs > 1 || cs > 1) {
               merges.push({ s: { r: r, c: col }, e: { r: r + rs - 1, c: col + cs - 1 } });
               for (var y = r; y < r + rs; y++)

@@ -9,9 +9,16 @@ window.TimetableApp.createTimetableView = function ({
   openEdit,
   openReminder
 }) {
-  const { $, DAY, el, append, courseTitle, conflictLabel } = ui;
+  const { $, DAY, el, append, courseTitle, conflictLabel, showDialog } = ui;
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   let entranceAnimations = [];
+  let selectedSlot = null;
+  function clearSlotSelection() {
+    if (!selectedSlot) return;
+    selectedSlot.classList.remove('selected-slot');
+    selectedSlot.setAttribute('aria-pressed', 'false');
+    selectedSlot = null;
+  }
   const stopMotion = () => {
     if (motionPreference.matches) {
       entranceAnimations.forEach((animation) => animation.cancel());
@@ -116,13 +123,13 @@ window.TimetableApp.createTimetableView = function ({
       (model.state.showInactiveCourses ? '隐藏' : '显示') + '非本周课程'
     );
     $('scheduleHint').textContent =
-      '左右滑动切换周次 · 点击空白格添加个人安排' +
+      '左右滑动切换周次 · 点击空白格选中，再点一次添加安排' +
       (model.state.showInactiveCourses ? ' · 灰色为非本周课程' : ' · 已隐藏非本周课程');
     $('conflictNotice').hidden = !conflicts.length;
     $('conflictNotice').replaceChildren();
     if (conflicts.length) {
       $('conflictNotice').append(
-        el('strong', '', '第 ' + model.week + ' 周有 ' + conflicts.length + ' 组时间冲突')
+        el('summary', '', '第 ' + model.week + ' 周有 ' + conflicts.length + ' 组时间冲突')
       );
       const list = el('ul', 'conflict-list');
       conflicts.slice(0, 100).forEach((conflict) => {
@@ -242,6 +249,7 @@ window.TimetableApp.createTimetableView = function ({
   }
   function renderGrid(active, dates, conflicts) {
     const grid = $('scheduleGrid');
+    clearSlotSelection();
     grid.replaceChildren();
     grid.style.setProperty('--sections', model.state.times.length);
     const today = T.dateString(new Date());
@@ -260,6 +268,21 @@ window.TimetableApp.createTimetableView = function ({
       highlight.setAttribute('aria-hidden', 'true');
       grid.append(highlight);
     }
+    // Give current-week courses priority, then keep one other-week course per overlapping slot.
+    const overlaps = (a, b) => a.day === b.day && a.start <= b.end && b.start <= a.end;
+    const visible = active.filter((course) => course.isActive),
+      folded = [];
+    for (const course of active.filter((item) => !item.isActive)) {
+      if (visible.some((item) => overlaps(item, course))) folded.push(course);
+      else visible.push(course);
+    }
+    const showOverlaps = (day, courses) => {
+      $('overlapTitle').textContent = DAY[day] + ' · 同一时段';
+      $('overlapList').replaceChildren(
+        ...courses.map((course) => courseRow(course, true, conflicts))
+      );
+      showDialog('overlapDialog');
+    };
     for (let i = 1; i <= model.state.times.length; i++) {
       const label = el('div', 'time-label');
       label.style.gridColumn = 1;
@@ -272,32 +295,53 @@ window.TimetableApp.createTimetableView = function ({
       );
       grid.append(label);
       for (let d = 1; d <= 7; d++) {
-        const occupied = active.some((c) => c.day === d && c.start <= i && c.end >= i);
+        const covers = (c) => c.day === d && c.start <= i && c.end >= i;
+        const occupied = visible.some(covers),
+          hiddenHere = folded.filter(covers);
         const slot = el(
           occupied ? 'div' : 'button',
           'grid-slot' +
-            (occupied ? '' : ' empty-slot') +
+            (occupied ? '' : hiddenHere.length ? ' other-week-marker' : ' empty-slot') +
             (dates[d - 1] === today ? ' today-column' : '')
         );
         slot.style.gridColumn = d + 1;
         slot.style.gridRow = i + 1;
-        if (!occupied) {
+        if (!occupied && hiddenHere.length) {
+          slot.type = 'button';
+          slot.textContent = '其他周 ' + hiddenHere.length + ' 门';
+          slot.setAttribute(
+            'aria-label',
+            DAY[d] + '第' + i + '节，其他周有 ' + hiddenHere.length + ' 门课程，点击查看'
+          );
+          slot.onclick = () => showOverlaps(d, hiddenHere);
+        } else if (!occupied) {
           slot.type = 'button';
           slot.dataset.day = d;
           slot.dataset.section = i;
+          slot.setAttribute('aria-pressed', 'false');
           slot.setAttribute(
             'aria-label',
             '添加个人安排，' + DAY[d] + '第' + i + '节，第' + model.week + '周'
           );
-          slot.onclick = () => openEdit(null, { day: d, start: i, end: i });
+          slot.onclick = (event) => {
+            if (selectedSlot !== slot) {
+              clearSlotSelection();
+              selectedSlot = slot;
+              slot.classList.add('selected-slot');
+              slot.setAttribute('aria-pressed', 'true');
+              return;
+            }
+            clearSlotSelection();
+            if (event.detail > 0) slot.blur();
+            openEdit(null, { day: d, start: i, end: i });
+          };
         }
         grid.append(slot);
       }
     }
-    // Assign overlapping courses to separate lanes; all remain clickable.
-    const positions = T.layoutCourses(active),
+    const positions = T.layoutCourses(visible),
       stacks = new Map();
-    for (const c of active) {
+    for (const c of visible) {
       const position = positions.get(c.id),
         { lane: index, count } = position;
       const inactive = !c.isActive;
@@ -345,7 +389,19 @@ window.TimetableApp.createTimetableView = function ({
       if (hasConflict)
         card.setAttribute('aria-label', card.getAttribute('aria-label') + '，时间冲突');
       append(card, el('strong', '', courseTitle(c)), el('small', '', c.room || '地点待定'));
-      card.addEventListener('click', () => detail(c.id));
+      const others = folded.filter((course) => overlaps(c, course));
+      if (others.length) {
+        card.classList.add('has-overlaps');
+        card.append(el('span', 'overlap-badge', '+' + others.length));
+        card.setAttribute(
+          'aria-label',
+          card.getAttribute('aria-label') + '，还有 ' + others.length + ' 门其他周课程，点击查看'
+        );
+        card.addEventListener('click', () => {
+          const sameTime = visible.filter((course) => course.id !== c.id && overlaps(c, course));
+          showOverlaps(c.day, [c, ...sameTime, ...others]);
+        });
+      } else card.addEventListener('click', () => detail(c.id));
       if (position.stackKey) {
         let host = stacks.get(position.stackKey);
         if (!host) {
@@ -455,6 +511,9 @@ window.TimetableApp.createTimetableView = function ({
     );
   }
   function bindEvents() {
+    document.addEventListener('click', (event) => {
+      if (selectedSlot && !event.target.closest('.empty-slot')) clearSlotSelection();
+    });
     $('toggleInactive').onclick = () =>
       persist({ ...model.state, showInactiveCourses: !model.state.showInactiveCourses });
     window.addEventListener('resize', sizeViewport);
@@ -463,5 +522,5 @@ window.TimetableApp.createTimetableView = function ({
     if (window.ResizeObserver) new ResizeObserver(fitCourseCards).observe($('scheduleGrid'));
     else window.addEventListener('resize', fitCourseCards);
   }
-  return { render, updateTimeCues, animateEntrance, courseRow, bindEvents };
+  return { render, updateTimeCues, animateEntrance, courseRow, bindEvents, clearSlotSelection };
 };

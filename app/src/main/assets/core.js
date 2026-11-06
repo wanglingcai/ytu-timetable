@@ -162,7 +162,38 @@
   }
 
   function parseCell(value, day, fallbackSections, source, warnings) {
-    const s = normalized(value);
+    let invalidBracketSections = false;
+    const s = normalized(value)
+      .replace(
+        /(\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*)\s*\((?:\[([单双]?周)\]|([单双]?周))\)/g,
+        (_match, weeks, bracketKind, plainKind) => {
+          const kind = bracketKind || plainKind;
+          return weeks + '周' + (kind === '周' ? '' : kind);
+        }
+      )
+      .replace(/\[([\d\s-]+)节\]/g, (original, numbers) => {
+        const sections = numbers.split('-').map((number) => Number(number.trim()));
+        if (
+          !sections.length ||
+          sections.some(
+            (section, index) =>
+              !Number.isInteger(section) ||
+              section < 1 ||
+              section > MAX_SECTIONS ||
+              (index > 0 && section !== sections[index - 1] + 1)
+          )
+        ) {
+          invalidBracketSections = true;
+          return original;
+        }
+        return (
+          sections[0] + (sections.length > 1 ? '-' + sections[sections.length - 1] : '') + '节'
+        );
+      });
+    if (invalidBracketSections) {
+      warnings.push(source + '：节次不连续或无效，未导入该格课程，请核对原课表。');
+      return [];
+    }
     const matches = weekMatches(s);
     if (!s || /^(?:无|暂无|上午|下午|晚上|晚间|午休)$/.test(s)) return [];
     if (!matches.length) {
@@ -365,6 +396,11 @@
     let previousSection = 0;
     for (let r = header + 1; r < rows.length; r++) {
       const row = rows[r] || [];
+      if (row.some((value) => /^无课表课程$/.test(text(value)))) {
+        if (rows.slice(r + 1).some((extraRow) => (extraRow || []).some((value) => text(value))))
+          warnings.push(source + '：另有无课表课程，缺少明确上课时间，未导入，请核对原文件。');
+        break;
+      }
       let section = null;
       for (let c = 0; c < firstDay; c++) {
         section = parseSections(row[c]);
@@ -1021,8 +1057,8 @@
         const stacked =
           group.length > 1 &&
           group.every((c) => c.start === group[0].start && c.end === group[0].end) &&
-          group.some((c) => c.isActive === true) &&
-          group.some((c) => c.isActive === false);
+          ((group.some((c) => c.isActive === true) && group.some((c) => c.isActive === false)) ||
+            (group.length === 2 && group.every((c) => c.isActive === true)));
         if (stacked) {
           const weight = group.reduce((sum, c) => sum + (c.isActive ? 2 : 1), 0);
           let offset = 0;

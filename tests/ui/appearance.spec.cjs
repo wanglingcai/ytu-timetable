@@ -59,16 +59,16 @@ test('图片、遮罩与模糊本地持久化；损坏图片保留原背景，�
   await expect.poll(()=>page.locator('#wallpaperImage').evaluate(n=>n.complete&&n.naturalWidth===320)).toBe(true);
   await page.locator('#settingsButton').click();await expect(page.locator('#backgroundMask')).toHaveValue('80');await expect(page.locator('#backgroundBlur')).toHaveValue('20');
   expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(before);
-  await page.locator('#settingsDialog .close-dialog').click();const download=page.waitForEvent('download');await page.locator('#backupButton').click();
+  const download=page.waitForEvent('download');await page.locator('#backupButton').click();
   const file=await(await download).createReadStream();let json='';for await(const chunk of file)json+=chunk;
   const saved=JSON.parse(json);expect(saved.courses).toHaveLength(6);expect(saved.appearance.mask).toBe(80);expect(saved.appearance.blur).toBe(20);expect(saved.appearance.image.length).toBeGreaterThan(100);expect(json).not.toMatch(/imageUrl|wallpaper|background\.jpg|blob:/);
-  await page.locator('#settingsButton').click();await page.locator('#resetBackground').click();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);
+  await page.locator('#resetBackground').click();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);
   await expect(page.locator('#backgroundMask')).toHaveValue('80');await expect(page.locator('#backgroundBlur')).toHaveValue('0');
   await page.reload();await expect(page.locator('body')).not.toHaveClass(/has-wallpaper/);
   expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(before);
 });
 test('暗色、纯白与高对比壁纸下的文字衬底和玻璃界面',async({page})=>{
-  await fixture(page);
+  await fixture(page);await page.locator('#weekSelect').selectOption('9');
   for(const kind of ['dark','white','pattern']) {
     await page.locator('#settingsButton').click();await choose(page,kind);
     await page.locator('#backgroundMask').fill('0');await page.locator('#backgroundMask').dispatchEvent('change');
@@ -76,7 +76,7 @@ test('暗色、纯白与高对比壁纸下的文字衬底和玻璃界面',async(
     await page.locator('#settingsDialog .close-dialog').click();
     expect(await page.locator('.schedule-wrap').evaluate(n=>{const s=getComputedStyle(n);return [s.backgroundColor,s.backdropFilter,s.webkitBackdropFilter||'none'];})).toEqual(['rgba(0, 0, 0, 0)','none','none']);
     expect(await page.locator('.course-card:not(.inactive)').first().evaluate(n=>getComputedStyle(n).backgroundColor)).toMatch(/, 0\.85\)$/);
-    expect(await page.locator('.course-card.inactive').evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.55)');
+    expect(await page.locator('.course-card.inactive').first().evaluate(n=>getComputedStyle(n).backgroundColor)).toBe('rgba(241, 245, 249, 0.55)');
     await page.screenshot({path:`test-results/wallpaper-${kind}-phone.png`,fullPage:true});
   }
 });
@@ -143,7 +143,7 @@ test('首次加载和快速切周按日期错峰入场，减少动态效果时�
   const timing=()=>page.evaluate(()=>Array.from(document.querySelectorAll('#nextCard,.week-card,#gridView,.course-card')).flatMap(node=>node.getAnimations().map(animation=>({id:node.id,day:Number(node.dataset.day)||0,...animation.effect.getTiming()}))));
   const initial=await timing();expect(initial.some(a=>a.id==='nextCard')).toBe(true);
   await page.locator('#prevWeek').click();await page.locator('#prevWeek').click();
-  const animations=await timing();expect(animations.length).toBe(9);
+  const animations=await timing();expect(animations.length).toBe(3+await page.locator('.course-card').count());
   animations.forEach(a=>{expect(a.duration).toBe(250);expect(a.easing).toBe('cubic-bezier(0.22, 1, 0.36, 1)');});
   const cards=animations.filter(a=>a.day);expect(cards.find(a=>a.day===7).delay-cards.find(a=>a.day===2).delay).toBe(150);
   await page.emulateMedia({reducedMotion:'reduce'});await expect.poll(timing).toEqual([]);

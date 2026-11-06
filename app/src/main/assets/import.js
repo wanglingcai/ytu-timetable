@@ -389,6 +389,10 @@ window.TimetableApp.createImport = function ({
     };
     $('sampleButton').onclick = sample;
     $('backupButton').onclick = backup;
+    $('restoreBackupButton').onclick = () => {
+      closeDialog('settingsDialog');
+      chooseFile();
+    };
     $('cancelImport').onclick = () => closeDialog('importDialog');
     $('saveImport').onclick = importSave;
     ['importButton', 'emptyImport'].forEach(

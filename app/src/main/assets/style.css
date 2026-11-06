@@ -477,6 +477,7 @@ dialog::backdrop {
   inset: 0;
   z-index: 1000;
   overflow: hidden;
+  pointer-events: none;
 }
 .guide-overlay[hidden] {
   display: none;
@@ -488,7 +489,12 @@ dialog::backdrop {
   box-shadow: 0 0 0 200vmax rgba(25, 38, 49, 0.64);
   pointer-events: none;
 }
+.guide-block {
+  position: fixed;
+  pointer-events: auto;
+}
 .guide-card {
+  pointer-events: auto;
   position: fixed;
   left: 12px;
   right: 12px;
@@ -1311,6 +1317,19 @@ footer {
   .bottom-sheet[open] {
     animation: sheet-enter 0.2s ease-out;
   }
+  .editor-sheet[open],
+  #courseDialog[open],
+  #overlapDialog[open] {
+    animation: editor-slide-in 0.2s ease-out;
+  }
+  @keyframes editor-slide-in {
+    from {
+      translate: 0 24px;
+    }
+    to {
+      translate: 0 0;
+    }
+  }
   @keyframes sheet-enter {
     from {
       opacity: 0.5;
@@ -1738,6 +1757,12 @@ textarea {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+.has-wallpaper #courseDialog,
+.has-wallpaper #overlapDialog {
+  background: #fff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 body {
   font-variant-numeric: tabular-nums;
 }
@@ -1793,13 +1818,26 @@ footer {
   background: transparent;
   box-shadow: none;
 }
-.grid-slot.empty-slot:hover {
-  background: rgba(56, 189, 248, 0.04);
-  outline: 0;
+.grid-slot.empty-slot {
+  -webkit-tap-highlight-color: transparent;
+}
+.course-card,
+.list-card,
+.other-week-marker {
+  -webkit-tap-highlight-color: transparent;
+}
+.grid-slot.empty-slot.selected-slot::after {
+  content: '＋';
+  display: block;
+  color: #94a3b0;
+  font-size: 27px;
+  font-weight: 300;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
 }
 .grid-slot.empty-slot:focus-visible {
-  background: rgba(56, 189, 248, 0.06);
-  outline: 2px solid #7dd3fc;
+  outline: 2px solid #64798c;
   outline-offset: -2px;
 }
 #scheduleGrid .course-card {
@@ -1866,4 +1904,58 @@ dialog {
 }
 .sun {
   color: #ffb52e;
+}
+
+/* Keep the week grid closer to the top while retaining the next-class card. */
+.shell {
+  padding-top: 12px;
+}
+.masthead,
+.next-card {
+  margin-bottom: 8px;
+}
+.section-heading {
+  margin-top: 8px;
+  margin-bottom: 5px;
+}
+.schedule-legend {
+  margin-bottom: 5px;
+}
+#conflictNotice {
+  margin: 0 0 6px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+#conflictNotice summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+#scheduleGrid .course-card.has-overlaps {
+  padding-bottom: 15px;
+}
+.overlap-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  min-width: 17px;
+  padding: 1px 3px;
+  border-radius: 5px;
+  background: #fff;
+  color: #245c84;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+#scheduleGrid .other-week-marker {
+  pointer-events: auto;
+  z-index: 2;
+  min-width: 0;
+  padding: 2px;
+  overflow: hidden;
+  background: #e9eef4;
+  color: #536a80;
+  font-size: 9px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }

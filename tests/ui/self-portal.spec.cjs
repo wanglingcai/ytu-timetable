@@ -22,6 +22,24 @@ test('周课表网格和明确标注的课程卡片可识别',async({page})=>{
   await page.setContent('<div class="course-card"><p>课程名称：英语</p><p>星期：星期二</p><p>节次：3-4</p><p>周次：1-16</p><p>教师：李老师</p><p>教室：B202</p></div><div class="course-card">课程缺少标签</div>');
   payload=JSON.parse(await page.evaluate(code=>eval(code),extract)); expect(payload.courses[0].name).toBe('英语'); expect(payload.warnings.join()).toContain('未导入');
 });
+test('自助网页中的方括号周次表格复用文件导入规则',async({page})=>{
+  await page.setContent('<table><tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th></tr><tr><th>第3节</th><td>模拟课程甲<br>模拟教师<br>1-3,5-7([周])[03-04-05节]<br>模拟楼101<br><br>模拟课程乙<br>教师乙<br>2-8([双周])[03-04-05节]<br>模拟楼202</td><td></td><td></td></tr></table>');
+  const payload=JSON.parse(await page.evaluate(code=>eval(code),extract));
+  expect(payload.courses).toHaveLength(2);
+  expect(payload.courses[0]).toMatchObject({name:'模拟课程甲',teacher:'模拟教师',room:'模拟楼101',day:1,start:3,end:5,weeks:[1,2,3,5,6,7]});
+  expect(payload.courses[1]).toMatchObject({name:'模拟课程乙',teacher:'教师乙',room:'模拟楼202',day:1,start:3,end:5,weeks:[2,4,6,8]});
+  await page.goto('/');await page.evaluate(p=>receivePortalImport(p),payload);
+  await expect(page.locator('#previewList .list-card')).toHaveCount(2);
+  expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBeNull();
+});
+test('同源框架中的强智详细课表提取多门课程',async({page})=>{
+  await page.setContent('<iframe></iframe>');
+  await page.locator('iframe').evaluate(frame=>{frame.contentDocument.body.innerHTML='<table><tr><th>节次</th><th>星期一</th><th>星期二</th><th>星期三</th></tr><tr><th>第1-2节</th><td><div class="kbcontent1">简略课程</div><div class="kbcontent" style="display:none">模拟课程甲<br><font title="老师">模拟教师</font><br><font title="周次(节次)">1-3,5-7(周)[01-02节]</font><br><font title="教室">模拟楼101</font><br>---------------------<br>模拟课程乙<br><font title="老师">教师乙</font><br><font title="周次(节次)">2-8(双周)[01-02节]</font><br><font title="教室">模拟楼202</font></div></td><td></td><td></td></tr></table>';});
+  const payload=JSON.parse(await page.evaluate(code=>eval(code),extract));
+  expect(payload.courses).toHaveLength(2);
+  expect(payload.courses[0]).toMatchObject({name:'模拟课程甲',teacher:'模拟教师',room:'模拟楼101',day:1,start:1,end:2,weeks:[1,2,3,5,6,7]});
+  expect(payload.courses[1]).toMatchObject({name:'模拟课程乙',teacher:'教师乙',room:'模拟楼202',day:1,start:1,end:2,weeks:[2,4,6,8]});
+});
 test('无课表或不完整课程返回文件导入提示',async({page})=>{
   await page.setContent('<div class="course-card"><p>课程名称：英语</p></div>');
   const payload=JSON.parse(await page.evaluate(code=>eval(code),extract)); expect(payload.error).toContain('Excel'); expect(payload.error).toContain('HTML'); expect(payload.error).toContain('原课表未修改'); expect(payload.courses).toBeUndefined();

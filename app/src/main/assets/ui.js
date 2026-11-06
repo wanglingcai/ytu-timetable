@@ -55,6 +55,7 @@ window.TimetableApp.createUI = function () {
     if (!d.open) {
       dialogStack = dialogStack.filter((x) => x.open);
       d.showModal();
+      document.dispatchEvent(new CustomEvent('guide-dialog-open'));
       dialogStack.push(d);
       d.scrollTop = 0;
       $('toast').hidden = true;

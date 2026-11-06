@@ -10,22 +10,22 @@ window.TimetableApp.createOnboarding = function ({ ui, model, sample }) {
     {
       selector: '.week-card',
       title: '查看不同周的安排',
-      text: '左右滑动或选择周次，点“回到本周”快速返回。'
+      text: '试试选择周次或点击箭头，点“回到本周”快速返回。'
     },
     {
       selector: '#gridView .course-card, #listView .list-card',
       title: '点开查看课程详情',
-      text: '查看教室、教师、周次，也能编辑课程。'
+      text: '点击课程试试，查看教室、教师和周次；关闭详情后继续引导。'
     },
     {
       selector: '#toggleInactive',
       title: '灰色课程不在本周上课',
-      text: '点这里可以显示或隐藏非本周课程。'
+      text: '试试点击这里，显示或隐藏非本周课程。'
     },
     {
       selector: '#addButton',
       title: '把自己的安排也记下来',
-      text: '添加自习、运动等安排，也能手动补课。'
+      text: '点这里可以添加安排或课程；引导结束后，也可连续点两次课表空白格添加个人安排。'
     }
   ];
   function read() {
@@ -77,6 +77,20 @@ window.TimetableApp.createOnboarding = function ({ ui, model, sample }) {
       top: top + 'px',
       width: Math.max(0, right - left) + 'px',
       height: Math.max(0, bottom - top) + 'px'
+    });
+    const blocks = [
+      ['guideBlockTop', 0, 0, innerWidth, top],
+      ['guideBlockLeft', 0, top, left, bottom - top],
+      ['guideBlockRight', right, top, innerWidth - right, bottom - top],
+      ['guideBlockBottom', 0, bottom, innerWidth, innerHeight - bottom]
+    ];
+    blocks.forEach(([id, x, y, width, height]) => {
+      Object.assign($(id).style, {
+        left: x + 'px',
+        top: y + 'px',
+        width: width + 'px',
+        height: height + 'px'
+      });
     });
     card.style.top = '';
     card.style.bottom = '';
@@ -163,6 +177,23 @@ window.TimetableApp.createOnboarding = function ({ ui, model, sample }) {
     return false;
   }
   function bindEvents() {
+    document.addEventListener('guide-dialog-open', () => {
+      if (step >= 0) $('guideOverlay').hidden = true;
+    });
+    document.addEventListener(
+      'close',
+      () => {
+        if (step < 0 || document.querySelector('dialog[open]')) return;
+        $('guideOverlay').hidden = false;
+        requestAnimationFrame(position);
+      },
+      true
+    );
+    const refresh = () => {
+      if (step >= 0 && !$('guideOverlay').hidden) requestAnimationFrame(position);
+    };
+    document.addEventListener('click', refresh);
+    document.addEventListener('change', refresh);
     $('welcomeImport').onclick = () => {
       closeDialog('welcomeDialog');
       showDialog('importChoice');

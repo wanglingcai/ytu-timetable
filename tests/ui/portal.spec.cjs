@@ -21,7 +21,7 @@ test('官网读取仅采集课程表，多课程、合并行、教师与隐藏�
   const before=await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'));
   await page.evaluate(()=>window.receivePortalImport({source:'ytu-urp',rows:[],merges:[]}));
   expect(await page.evaluate(()=>localStorage.getItem('ytu-timetable-v1'))).toBe(before);
-  await page.reload();await expect(page.locator('.course-card')).toHaveCount(2);
+  await page.reload();await page.locator('#viewToggle').click();await expect(page.locator('#listView .list-card')).toHaveCount(2);
   await page.screenshot({path:'test-results/portal-import-phone.png',fullPage:true});
 });
 test('官网尚未加载或空课表时返回明确错误，桌面预览引导安卓使用',async({page})=>{

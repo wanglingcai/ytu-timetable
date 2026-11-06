@@ -46,6 +46,19 @@ test('URP 一个单元格包含多门不同时周课程，不能丢第二门',()
   const courses=T.parseCell(cell,1,null,'A1',warnings);
   assert.equal(courses.length,2);assert.equal(courses[1].name,'课程乙');assert.equal(courses[1].teacher,'教师乙');assert.equal(courses[1].room,'教室乙');assert.deepEqual(courses[1].weeks,[9,10,11,12,13,14,15,16]);
 });
+test('方括号周次与连续节次的课表保留多门课程并跳过无课表清单',()=>{
+  const cell='模拟课程甲\n教师甲,教师乙\n1-3,5-7([周])[03-04-05节]\n模拟楼101\n\n模拟课程乙\n教师丙\n2-8([双周])[03-04-05节]\n模拟楼202';
+  const rows=[['节次','星期一','星期二','星期三'],['第3节',cell,'',''],['无课表课程','','',''],['序号','课程名称','授课教师','课程性质'],['1','未排课','教师丁','必修']];
+  const result=T.parseMatrix(rows);
+  assert.equal(result.courses.length,2);
+  assert.deepEqual(result.courses.map(c=>({name:c.name,teacher:c.teacher,room:c.room,day:c.day,start:c.start,end:c.end,weeks:c.weeks})),[
+    {name:'模拟课程甲',teacher:'教师甲,教师乙',room:'模拟楼101',day:1,start:3,end:5,weeks:[1,2,3,5,6,7]},
+    {name:'模拟课程乙',teacher:'教师丙',room:'模拟楼202',day:1,start:3,end:5,weeks:[2,4,6,8]}
+  ]);
+  assert.equal(result.warnings.length,1);assert.match(result.warnings[0],/无课表课程/);
+  const warnings=[];assert.deepEqual(T.parseCell('模拟课程\n教师\n1-8([周])[03-05节]\n教室',1,{start:3,end:5},'测试',warnings),[]);
+  assert.match(warnings[0],/不连续/);
+});
 test('课程清单按表头解析，异常行明确报告，重复去重',()=>{
   const rows=[['个人课程'],['课程名称','星期','节次','周次','教师','教室'],['数据结构','星期二','3-4','1-16','张老师','A301'],['数据结构','星期二','3-4','1-16','张老师','A301'],['未知','星期三','5-6','','','']];
   const result=T.parseMatrix(rows);assert.equal(result.courses.length,1);assert.equal(result.warnings.length,2);assert.match(result.warnings[0],/未导入/);assert.match(result.warnings[1],/重复/);

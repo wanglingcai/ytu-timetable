@@ -19,12 +19,12 @@ test('课程提醒与个人安排分别设置，修改后备份恢复保留提�
     await page.locator('#settingsButton').click();await expect(page.locator('#courseReminder')).toHaveValue(minutes);
   }
   await page.locator('#settingsDialog .close-dialog').click();
-  await page.locator('.empty-slot[data-day="7"][data-section="5"]').click();await expect(page.locator('#personalReminder')).toHaveValue('-1');
+  await page.locator('.empty-slot[data-day="7"][data-section="5"]').click();await page.locator('.empty-slot[data-day="7"][data-section="5"]').click();await expect(page.locator('#personalReminder')).toHaveValue('-1');
   await page.locator('#courseName').fill('模拟自习');await page.locator('#personalReminder').selectOption('15');await page.locator('#saveCourse').click();
   await page.locator('.personal-entry').click();await expect(page.locator('#courseDetail')).toContainText('提前 15 分钟');
   await page.getByRole('button',{name:'修改安排',exact:true}).click();await expect(page.locator('#personalReminder')).toHaveValue('15');
   await page.locator('#personalReminder').selectOption('0');await page.locator('#saveCourse').click();
-  const waiting=page.waitForEvent('download');await page.locator('#backupButton').click();const download=await waiting;
+  await page.locator('#settingsButton').click();const waiting=page.waitForEvent('download');await page.locator('#backupButton').click();const download=await waiting;
   const state=JSON.parse(fs.readFileSync(await download.path(),'utf8'));expect(state.courses.find(c=>c.kind==='personal').reminderMinutes).toBe(0);
   await page.evaluate(()=>localStorage.clear());await page.reload();
   await page.locator('#fileInput').setInputFiles({name:'模拟提醒备份.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(state))});
